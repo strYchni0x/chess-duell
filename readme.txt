@@ -4,7 +4,7 @@ Tags: chess, schach, game, multiplayer, spiel
 Requires at least: 5.6
 Tested up to: 6.8
 Requires PHP: 7.2
-Stable tag: 1.5.3
+Stable tag: 1.5.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -83,6 +83,9 @@ Aufgabe oder Remis oder verfällt nach der im Backend eingestellten Inaktivität
 3. Backend-Einstellungen: Anzahl gleichzeitiger Partien und Laufzeit.
 
 == Changelog ==
+
+= 1.5.4 =
+* Fix: configuration (REST URL) is also passed via a data attribute – now works even with a Content-Security-Policy or script optimizers that strip inline scripts.
 
 = 1.5.3 =
 * Fix: polling now also works with plain permalinks (?rest_route=).

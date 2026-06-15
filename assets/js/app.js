@@ -14,6 +14,16 @@
   var I18N = CFG.i18n || {};
   var POLL_MS = 2000;
 
+  // Read config preferably from the container (robust against CSP / script
+  // optimizers that may strip the wp_localize_script inline script).
+  function readConfig(root) {
+    try {
+      var raw = root && root.getAttribute && root.getAttribute('data-config');
+      if (raw) { CFG = JSON.parse(raw); I18N = CFG.i18n || {}; }
+    } catch (e) { /* fallback: window.ChessDuellConfig */ }
+    return CFG;
+  }
+
   function t(s) { return (I18N && I18N[s]) || s; }
   function tf(s) {
     var str = t(s); var args = arguments; var i = 1;
@@ -94,6 +104,7 @@
 
   function ChessDuell(root) {
     this.root = root;
+    readConfig(root);
     this.engine = new Engine();
     this.gameId = null;
     this.token = null;
