@@ -4,7 +4,7 @@ Tags: chess, schach, game, multiplayer, spiel
 Requires at least: 5.6
 Tested up to: 6.8
 Requires PHP: 7.2
-Stable tag: 1.3.0
+Stable tag: 1.4.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -32,6 +32,14 @@ Funktionen:
   automatischen Ende (Einstellungen > Chess Duell).
 * Eine Partie endet nur durch Matt, Aufgabe oder Remis – oder verfällt nach
   der eingestellten Inaktivitätsdauer (Standard 14 Tage).
+* Optionale Schachuhr beim Erstellen der Partie. Es zählt nur die Online-Zeit
+  des Spielers am Zug – ist jemand offline, pausiert seine Uhr (keine über Nacht
+  verbrauchte Zeit). Bei Zeitüberschreitung verliert der Spieler.
+* Optionale E-Mail-Benachrichtigung, wenn man am Zug ist (bei angemeldeten
+  Nutzern mit hinterlegter Adresse vorausgefüllt). Die Adresse wird nur für die
+  Benachrichtigung verwendet und mit dem Spielende automatisch gelöscht – nicht
+  dauerhaft gespeichert (technisch im Server-Log sichtbar).
+* Updates unterbrechen laufende Partien nicht (abwärtskompatible Datensätze).
 * Synchronisation über die WordPress-REST-API (Polling, alle 2 Sekunden).
 * Keine externen Abhängigkeiten (keine CDN, keine Bilder) – Unicode-Figuren.
 
@@ -54,6 +62,11 @@ illegalen Zug durchsetzen. Spieler-Identitäten werden über ein geheimes Token
 im Link/Local-Storage des Browsers verwaltet.
 
 == Changelog ==
+
+= 1.4.0 =
+* Optionale Schachuhr (zählt nur Online-Zeit, pausiert bei Abwesenheit).
+* Optionale E-Mail-Benachrichtigung "Du bist am Zug"; Adresse wird mit Spielende gelöscht.
+* Abwärtskompatibel: laufende Partien überstehen das Update unverändert.
 
 = 1.3.0 =
 * Angemeldete WordPress-Nutzer dürfen das Partien-Limit übergehen.

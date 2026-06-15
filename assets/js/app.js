@@ -48,6 +48,37 @@
   function defaultName() {
     return loadName() || (CFG.userName || '');
   }
+  function loadEmail() {
+    try { return localStorage.getItem('chessduell_email') || ''; } catch (e) { return ''; }
+  }
+  function saveEmail(v) {
+    try { localStorage.setItem('chessduell_email', v); } catch (e) {}
+  }
+  function defaultEmail() {
+    return loadEmail() || (CFG.userEmail || '');
+  }
+  function pageUrl() {
+    return window.location.origin + window.location.pathname;
+  }
+
+  // Schachuhr-Voreinstellungen (Basiszeit Minuten + Inkrement Sekunden je Zug).
+  var CLOCK_PRESETS = [
+    { label: 'Ohne Uhr', base: 0, inc: 0 },
+    { label: '5 Minuten', base: 5, inc: 0 },
+    { label: '10 Minuten', base: 10, inc: 0 },
+    { label: '15 Min + 10 Sek/Zug', base: 15, inc: 10 },
+    { label: '30 Minuten', base: 30, inc: 0 }
+  ];
+
+  function fmtClock(ms) {
+    if (ms < 0) { ms = 0; }
+    var total = Math.ceil(ms / 1000);
+    var h = Math.floor(total / 3600);
+    var m = Math.floor((total % 3600) / 60);
+    var s = total % 60;
+    function pad(n) { return n < 10 ? '0' + n : '' + n; }
+    return (h > 0 ? h + ':' + pad(m) : '' + m) + ':' + pad(s);
+  }
 
   function ChessDuell(root) {
     this.root = root;
@@ -61,6 +92,10 @@
     this.pendingPromo = null; // {from,to}
     this.pollTimer = null;
     this.state = null;
+    this.clockState = { enabled: false };
+    this.clockSyncAt = 0;
+    this.clockTimer = null;
+    this.flagFetched = false;
     this.init();
   }
 
@@ -85,7 +120,30 @@
     nameInput.maxLength = 24;
     nameInput.placeholder = 'Dein Name (optional)';
     nameInput.value = defaultName();
+    box.appendChild(el('label', 'cd-field-label', 'Dein Name'));
     box.appendChild(nameInput);
+
+    // Schachuhr
+    box.appendChild(el('label', 'cd-field-label', 'Schachuhr'));
+    var clockSelect = el('select', 'cd-select');
+    CLOCK_PRESETS.forEach(function (p, i) {
+      var opt = el('option', null, p.label);
+      opt.value = String(i);
+      clockSelect.appendChild(opt);
+    });
+    box.appendChild(clockSelect);
+    box.appendChild(el('div', 'cd-hint', 'Es zählt nur die Online-Zeit des Spielers am Zug. Ist jemand offline, pausiert seine Uhr.'));
+
+    // E-Mail-Benachrichtigung
+    box.appendChild(el('label', 'cd-field-label', 'E-Mail für Zug-Benachrichtigung (optional)'));
+    var emailInput = el('input', 'cd-name-input');
+    emailInput.type = 'email';
+    emailInput.maxLength = 100;
+    emailInput.placeholder = 'name@beispiel.de';
+    emailInput.value = defaultEmail();
+    box.appendChild(emailInput);
+    box.appendChild(el('div', 'cd-hint',
+      'Wird nur verwendet, um dich zu benachrichtigen, wenn du am Zug bist, und mit dem Spielende automatisch gelöscht – nicht dauerhaft gespeichert. Hinweis: Wie jede Eingabe ist die Adresse technisch im Server-Log sichtbar.'));
 
     var btn = el('button', 'cd-btn cd-btn-primary', 'Neue Partie starten');
     var msg = el('div', 'cd-msg');
@@ -94,8 +152,14 @@
       btn.disabled = true;
       msg.textContent = 'Erstelle Partie ...';
       var nm = nameInput.value.trim();
+      var em = emailInput.value.trim();
+      var preset = CLOCK_PRESETS[parseInt(clockSelect.value, 10)] || CLOCK_PRESETS[0];
       saveName(nm);
-      api('game', 'POST', { name: nm }).then(function (data) {
+      saveEmail(em);
+      api('game', 'POST', {
+        name: nm, email: em, page: pageUrl(),
+        clock_base: preset.base, clock_inc: preset.inc
+      }).then(function (data) {
         saveIdentity(data.id, { token: data.token, color: data.color });
         var url = self.gameUrl(data.id);
         history.replaceState(null, '', url);
@@ -121,10 +185,13 @@
     var self = this;
     this.gameId = id;
     var ident = loadIdentity(id);
-    var body = {};
+    var body = { page: pageUrl() };
     if (ident && ident.token) { body.token = ident.token; }
     var myName = defaultName();
     if (myName) { body.name = myName; }
+    // Nur eine ausdrücklich gesetzte Adresse senden (Opt-in), nicht die reine Vorbelegung.
+    var myEmail = loadEmail();
+    if (myEmail) { body.email = myEmail; }
     this.root.innerHTML = '<div class="cd-msg">Verbinde mit Partie ...</div>';
     api('game/' + id + '/join', 'POST', body).then(function (data) {
       self.color = data.color;
@@ -161,6 +228,10 @@
       this.engine.move({ from: m.from, to: m.to, promotion: m.promotion });
     }
     this.appliedMoves = moves.length;
+    // Uhr-Stand synchronisieren (Basis für die lokale Anzeige bis zum nächsten Poll).
+    this.clockState = state.clock || { enabled: false };
+    this.clockSyncAt = Date.now();
+    this.flagFetched = false;
   };
 
   // ---------- Spielansicht ----------
@@ -171,6 +242,9 @@
 
     this.statusBar = el('div', 'cd-status');
     wrap.appendChild(this.statusBar);
+
+    this.clocksEl = el('div', 'cd-clocks');
+    wrap.appendChild(this.clocksEl);
 
     this.boardEl = el('div', 'cd-board');
     if (this.color === 'black') { this.boardEl.classList.add('cd-flip'); }
@@ -202,6 +276,19 @@
       nameWrap.appendChild(nameField);
       controls.appendChild(nameWrap);
 
+      var emailWrap = el('div', 'cd-name-edit');
+      emailWrap.appendChild(el('label', 'cd-name-label', 'E-Mail-Benachrichtigung'));
+      var emailField = el('input', 'cd-name-input');
+      emailField.type = 'email';
+      emailField.maxLength = 100;
+      emailField.placeholder = 'name@beispiel.de';
+      emailField.value = defaultEmail();
+      emailField.addEventListener('change', function () { self.saveOwnEmail(this.value); });
+      emailWrap.appendChild(emailField);
+      emailWrap.appendChild(el('div', 'cd-hint',
+        'Benachrichtigung, wenn du am Zug bist. Adresse wird mit Spielende gelöscht, nicht dauerhaft gespeichert (im Server-Log sichtbar). Feld leeren = aus.'));
+      controls.appendChild(emailWrap);
+
       this.resignBtn = el('button', 'cd-btn cd-btn-danger', 'Aufgeben');
       this.resignBtn.addEventListener('click', function () { self.resign(); });
       controls.appendChild(this.resignBtn);
@@ -225,12 +312,15 @@
     this.updateStatus();
     this.updateMoveList();
     this.updateShare();
+    this.startClock();
   };
 
   ChessDuell.prototype.reset = function () {
+    this.stopClock();
     this.engine = new Engine();
     this.gameId = this.token = this.color = null;
     this.appliedMoves = 0; this.selected = null; this.state = null;
+    this.clockState = { enabled: false };
   };
 
   ChessDuell.prototype.updateShare = function () {
@@ -406,6 +496,62 @@
     }).catch(function (e) { console.warn(e.message); });
   };
 
+  ChessDuell.prototype.saveOwnEmail = function (value) {
+    var self = this;
+    var em = (value || '').trim();
+    saveEmail(em);
+    if (!this.token) { return; }
+    // Leeres Feld = Benachrichtigung deaktivieren (Adresse wird serverseitig entfernt).
+    api('game/' + this.gameId + '/join', 'POST', { token: this.token, email: em }).then(function (data) {
+      if (data && data.state) { self.state = data.state; }
+    }).catch(function (e) { console.warn(e.message); });
+  };
+
+  // ---------- Schachuhr ----------
+  ChessDuell.prototype.startClock = function () {
+    var self = this;
+    this.stopClock();
+    if (!this.clockState || !this.clockState.enabled) { this.renderClocks(); return; }
+    this.clockTimer = setInterval(function () { self.renderClocks(); }, 250);
+    this.renderClocks();
+  };
+  ChessDuell.prototype.stopClock = function () {
+    if (this.clockTimer) { clearInterval(this.clockTimer); this.clockTimer = null; }
+  };
+  ChessDuell.prototype.liveClock = function (color) {
+    var cs = this.clockState;
+    var ms = color === 'w' ? cs.white_ms : cs.black_ms;
+    if (cs.running === color) { ms -= (Date.now() - this.clockSyncAt); }
+    return ms < 0 ? 0 : ms;
+  };
+  ChessDuell.prototype.renderClocks = function () {
+    var c = this.clocksEl; if (!c) { return; }
+    var cs = this.clockState;
+    if (!cs || !cs.enabled) { c.innerHTML = ''; c.style.display = 'none'; return; }
+    c.style.display = '';
+    var wName = (this.state && this.state.white_name) ? this.state.white_name : 'Weiß';
+    var bName = (this.state && this.state.black_name) ? this.state.black_name : 'Schwarz';
+    var wMs = this.liveClock('w');
+    var bMs = this.liveClock('b');
+
+    c.innerHTML = '';
+    var wBox = el('div', 'cd-clock' + (cs.running === 'w' ? ' cd-clock-run' : ''));
+    wBox.appendChild(el('span', 'cd-clock-name', '♔ ' + wName));
+    wBox.appendChild(el('span', 'cd-clock-time', fmtClock(wMs)));
+    var bBox = el('div', 'cd-clock' + (cs.running === 'b' ? ' cd-clock-run' : ''));
+    bBox.appendChild(el('span', 'cd-clock-name', '♚ ' + bName));
+    bBox.appendChild(el('span', 'cd-clock-time', fmtClock(bMs)));
+    c.appendChild(wBox);
+    c.appendChild(bBox);
+
+    // Lokaler Flag-Fall: wenn meine eigene Uhr 0 erreicht, Server final entscheiden lassen.
+    var myCode = this.color === 'white' ? 'w' : this.color === 'black' ? 'b' : null;
+    if (myCode && cs.running === myCode && (myCode === 'w' ? wMs : bMs) <= 0 && !this.flagFetched) {
+      this.flagFetched = true;
+      this.fetchState();
+    }
+  };
+
   ChessDuell.prototype.resign = function () {
     if (!confirm('Partie wirklich aufgeben?')) { return; }
     var self = this;
@@ -431,9 +577,18 @@
 
     if (this.state && this.state.status === 'finished') {
       var res = this.state.result;
-      if (res === '1-0') { line2 = 'Sieg – ' + wName + ' gewinnt'; }
-      else if (res === '0-1') { line2 = 'Sieg – ' + bName + ' gewinnt'; }
-      else { line2 = 'Remis'; }
+      var rt = this.state.result_type;
+      var winner = res === '1-0' ? wName : (res === '0-1' ? bName : null);
+      if (res === '1/2-1/2') {
+        line2 = 'Remis' + (rt === 'stalemate' ? ' (Patt)' : rt === 'fiftymove' ? ' (50-Züge-Regel)'
+              : rt === 'material' ? ' (unzureichendes Material)' : '');
+      } else if (winner) {
+        var how = rt === 'timeout' ? ' (Zeit abgelaufen)' : rt === 'resign' ? ' (Aufgabe)'
+                : rt === 'checkmate' ? ' (Schachmatt)' : '';
+        line2 = 'Sieg – ' + winner + ' gewinnt' + how;
+      } else {
+        line2 = 'Partie beendet';
+      }
       cls += ' cd-status-over';
     } else if (st.over) {
       if (st.type === 'checkmate') { line2 = 'Schachmatt – ' + (st.winner === 'w' ? wName : bName) + ' gewinnt'; }
@@ -476,6 +631,7 @@
     this.updateStatus();
     this.updateMoveList();
     this.updateShare();
+    this.renderClocks();
   };
 
   // ---------- Polling ----------
@@ -490,17 +646,21 @@
   ChessDuell.prototype.fetchState = function () {
     var self = this;
     if (document.hidden) { return; }
-    api('game/' + this.gameId).then(function (data) {
+    // Token als Heartbeat mitgeben, damit der Server die Online-Zeit der Uhr bucht.
+    var path = 'game/' + this.gameId + (this.token ? '?t=' + encodeURIComponent(this.token) : '');
+    api(path).then(function (data) {
       var before = self.appliedMoves;
       var beforeBlack = self.state && self.state.has_black;
+      var beforeStatus = self.state && self.state.status;
       self.applyState(data);
       if (self.appliedMoves !== before || (data.has_black && !beforeBlack) ||
-          (data.status === 'finished')) {
+          (data.status !== beforeStatus)) {
         self.refreshUI();
       } else {
-        // nur Verbindungsstatus evtl. geaendert
+        // Verbindungs-/Uhr-Status aktualisieren
         self.updateShare();
         self.updateStatus();
+        self.renderClocks();
       }
     }).catch(function () { /* still */ });
   };

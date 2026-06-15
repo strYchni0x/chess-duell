@@ -3,7 +3,7 @@
  * Plugin Name:       Chess Duell
  * Plugin URI:        https://willnat.org/
  * Description:        Zwei Menschen spielen online Schach gegeneinander – Partie einfach per Link teilen. Anzahl gleichzeitiger Partien und Laufzeit im Backend einstellbar. Serverseitige Regelprüfung (kein Cheaten möglich), keine KI. Einbinden mit dem Shortcode [chess_duell].
- * Version:           1.3.0
+ * Version:           1.4.0
  * Author:            Florian Willnat
  * License:           GPL-2.0-or-later
  * License URI:       https://www.gnu.org/licenses/gpl-2.0.html
@@ -22,6 +22,12 @@ define('CHESS_DUELL_SETTINGS', 'chess_duell_settings');
 
 define('CHESS_DUELL_DEFAULT_MAX_GAMES', 10); // Standard: max. gleichzeitige Partien
 define('CHESS_DUELL_DEFAULT_TTL_DAYS', 14);  // Standard: Tage bis eine inaktive Partie verfällt
+
+// Schachuhr: Es zählt nur die Online-Zeit des Spielers am Zug. Ein "Heartbeat"
+// (Polling) gilt als online. Lücken größer als dieses Fenster werden gekappt,
+// damit Offline-Pausen (z. B. bis zum nächsten Tag) nicht als Bedenkzeit zählen.
+define('CHESS_DUELL_ONLINE_WINDOW_MS', 8000); // Spieler gilt als online, wenn Ping jünger
+define('CHESS_DUELL_MAX_TICK_MS', 8000);      // max. anrechenbare Zeit pro Heartbeat
 
 define('CHESS_DUELL_START_FEN', 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1');
 
@@ -61,7 +67,50 @@ function chess_duell_ttl() {
 
 function chess_duell_load_games() {
     $g = get_option(CHESS_DUELL_OPTION, array());
-    return is_array($g) ? $g : array();
+    if (!is_array($g)) {
+        return array();
+    }
+    // Abwärtskompatibilität: Datensätze älterer Versionen um neue Felder
+    // ergänzen, damit laufende Partien nach einem Update nicht abbrechen.
+    foreach ($g as $id => $game) {
+        $g[$id] = chess_duell_normalize_game($game);
+    }
+    return $g;
+}
+
+/** Fehlende Felder eines Spieldatensatzes mit sicheren Defaults auffüllen. */
+function chess_duell_normalize_game($game) {
+    $defaults = array(
+        'id'            => '',
+        'fen'           => CHESS_DUELL_START_FEN,
+        'turn'          => 'w',
+        'moves'         => array(),
+        'white_token'   => '',
+        'black_token'   => null,
+        'white_name'    => '',
+        'black_name'    => '',
+        'white_email'   => '',
+        'black_email'   => '',
+        'status'        => 'waiting',
+        'result'        => null,
+        'result_type'   => null,
+        'created'       => time(),
+        'updated'       => time(),
+        // Schachuhr (aus = klassische Partie ohne Zeitlimit, wie bisher)
+        'clock_enabled' => false,
+        'clock_base'    => 0,
+        'clock_inc'     => 0,
+        'white_ms'      => 0,
+        'black_ms'      => 0,
+        'clock_last'    => null,
+        'seen_w'        => null,
+        'seen_b'        => null,
+        // Benachrichtigung
+        'page'          => '',
+        'last_notify_w' => 0,
+        'last_notify_b' => 0,
+    );
+    return array_merge($defaults, (array) $game);
 }
 
 function chess_duell_save_games($games) {
@@ -84,16 +133,21 @@ function chess_duell_prune($games) {
 /** Öffentliche Sicht eines Spiels (ohne geheime Tokens). */
 function chess_duell_public_state($game) {
     return array(
-        'id'         => $game['id'],
-        'fen'        => $game['fen'],
-        'turn'       => $game['turn'],
-        'moves'      => $game['moves'],
-        'status'     => $game['status'],
-        'result'     => $game['result'],
-        'has_black'  => !empty($game['black_token']),
-        'white_name' => isset($game['white_name']) ? $game['white_name'] : '',
-        'black_name' => isset($game['black_name']) ? $game['black_name'] : '',
-        'updated'    => intval($game['updated']),
+        'id'           => $game['id'],
+        'fen'          => $game['fen'],
+        'turn'         => $game['turn'],
+        'moves'        => $game['moves'],
+        'status'       => $game['status'],
+        'result'       => $game['result'],
+        'result_type'  => isset($game['result_type']) ? $game['result_type'] : null,
+        'has_black'    => !empty($game['black_token']),
+        'white_name'   => isset($game['white_name']) ? $game['white_name'] : '',
+        'black_name'   => isset($game['black_name']) ? $game['black_name'] : '',
+        // Adressen werden NICHT ausgegeben – nur ob eine Benachrichtigung aktiv ist.
+        'white_notify' => !empty($game['white_email']),
+        'black_notify' => !empty($game['black_email']),
+        'clock'        => chess_duell_clock_public($game),
+        'updated'      => intval($game['updated']),
     );
 }
 
@@ -123,6 +177,150 @@ function chess_duell_sanitize_name($name) {
         $name = substr($name, 0, 24);
     }
     return $name;
+}
+
+/** E-Mail bereinigen, leeren String bei ungültiger Adresse. */
+function chess_duell_sanitize_email($email) {
+    $email = sanitize_email((string) $email);
+    return ($email && is_email($email)) ? $email : '';
+}
+
+/** Hinterlegte E-Mail des angemeldeten WP-Nutzers (sonst leer). */
+function chess_duell_default_email() {
+    if (is_user_logged_in()) {
+        return chess_duell_sanitize_email(wp_get_current_user()->user_email);
+    }
+    return '';
+}
+
+/* ------------------------------------------------------------------ *
+ *  Schachuhr – es zählt nur die Online-Zeit des Spielers am Zug
+ * ------------------------------------------------------------------ */
+
+function chess_duell_now_ms() {
+    return (int) round(microtime(true) * 1000);
+}
+
+/** Adressen aus dem Datensatz entfernen (z. B. bei Spielende). */
+function chess_duell_clear_emails(&$game) {
+    $game['white_email'] = '';
+    $game['black_email'] = '';
+}
+
+/**
+ * Verbucht die Online-Bedenkzeit. Wird bei jedem "Heartbeat" (Poll/Zug/Join)
+ * aufgerufen. Nur eigene Pings des Spielers am Zug zählen, und nur in kleinen
+ * Schritten (gekappt), sodass Offline-Phasen die Uhr nicht belasten.
+ */
+function chess_duell_account_clock(&$game, $pinging_color, $now) {
+    if (empty($game['clock_enabled']) || $game['status'] === 'finished' || empty($game['black_token'])) {
+        return;
+    }
+    // Anwesenheit merken
+    if ($pinging_color === 'w') {
+        $game['seen_w'] = $now;
+    } elseif ($pinging_color === 'b') {
+        $game['seen_b'] = $now;
+    }
+    // Nur die eigene Online-Zeit des Spielers am Zug anrechnen.
+    $turn = $game['turn'];
+    if ($pinging_color !== $turn) {
+        return;
+    }
+    if ($game['clock_last'] === null) {
+        $game['clock_last'] = $now;
+        return;
+    }
+    $delta = $now - intval($game['clock_last']);
+    $game['clock_last'] = $now;
+    if ($delta <= 0) {
+        return;
+    }
+    if ($delta > CHESS_DUELL_MAX_TICK_MS) {
+        $delta = CHESS_DUELL_MAX_TICK_MS; // Offline-Lücke kappen
+    }
+    if ($turn === 'w') {
+        $game['white_ms'] = max(0, intval($game['white_ms']) - $delta);
+        $rem = $game['white_ms'];
+    } else {
+        $game['black_ms'] = max(0, intval($game['black_ms']) - $delta);
+        $rem = $game['black_ms'];
+    }
+    if ($rem <= 0) {
+        $game['status']      = 'finished';
+        $game['result']      = ($turn === 'w') ? '0-1' : '1-0';
+        $game['result_type'] = 'timeout';
+        $game['updated']     = time();
+        chess_duell_clear_emails($game);
+    }
+}
+
+/** Welche Farbe ist online am Zug (für die Anzeige der laufenden Uhr)? */
+function chess_duell_clock_running($game, $now) {
+    if (empty($game['clock_enabled']) || $game['status'] === 'finished' || empty($game['black_token'])) {
+        return null;
+    }
+    $turn = $game['turn'];
+    $seen = ($turn === 'w') ? $game['seen_w'] : $game['seen_b'];
+    if ($seen === null || ($now - intval($seen)) > CHESS_DUELL_ONLINE_WINDOW_MS) {
+        return null; // Spieler am Zug ist offline -> Uhr pausiert
+    }
+    return $turn;
+}
+
+/** Uhr-Teil der öffentlichen Sicht. */
+function chess_duell_clock_public($game) {
+    if (empty($game['clock_enabled'])) {
+        return array('enabled' => false);
+    }
+    return array(
+        'enabled'  => true,
+        'base'     => intval($game['clock_base']),
+        'inc'      => intval($game['clock_inc']),
+        'white_ms' => intval($game['white_ms']),
+        'black_ms' => intval($game['black_ms']),
+        'running'  => chess_duell_clock_running($game, chess_duell_now_ms()),
+    );
+}
+
+/* ------------------------------------------------------------------ *
+ *  E-Mail-Benachrichtigung (Adresse wird mit Spielende gelöscht)
+ * ------------------------------------------------------------------ */
+
+/** Link zur Partie (für die Benachrichtigung). */
+function chess_duell_game_link($game) {
+    $base = !empty($game['page']) ? $game['page'] : home_url('/');
+    return add_query_arg('chess_game', rawurlencode($game['id']), $base);
+}
+
+/** Den Spieler der Farbe $color benachrichtigen, dass er am Zug ist. */
+function chess_duell_notify_turn(&$game, $color) {
+    $email = ($color === 'w') ? $game['white_email'] : $game['black_email'];
+    if (empty($email)) {
+        return;
+    }
+    // Einfacher Spam-Schutz: höchstens alle 10 Sekunden eine Mail je Spieler.
+    $key  = ($color === 'w') ? 'last_notify_w' : 'last_notify_b';
+    $now  = time();
+    if ($now - intval($game[$key]) < 10) {
+        return;
+    }
+    $game[$key] = $now;
+
+    $oppName = ($color === 'w')
+        ? ($game['black_name'] !== '' ? $game['black_name'] : 'Schwarz')
+        : ($game['white_name'] !== '' ? $game['white_name'] : 'Weiß');
+    $link    = chess_duell_game_link($game);
+
+    $subject = 'Schach: Du bist am Zug';
+    $body    = sprintf(
+        "Hallo,\n\n%s hat gezogen – du bist jetzt am Zug.\n\nZur Partie:\n%s\n\n" .
+        "Hinweis: Deine Adresse wird nur für Benachrichtigungen dieser Partie verwendet " .
+        "und mit dem Spielende automatisch gelöscht. Sie wird nicht dauerhaft gespeichert.",
+        $oppName,
+        $link
+    );
+    wp_mail($email, $subject, $body);
 }
 
 /* ------------------------------------------------------------------ *
@@ -196,22 +394,46 @@ function chess_duell_rest_create($req) {
     if ($name === '') {
         $name = chess_duell_default_name(); // ggf. WP-Anzeigename
     }
+    $email = chess_duell_sanitize_email(isset($body['email']) ? $body['email'] : '');
+
+    // Schachuhr: Basiszeit in Minuten + Inkrement in Sekunden (0 = ohne Uhr).
+    $base_min = isset($body['clock_base']) ? intval($body['clock_base']) : 0;
+    $inc_sec  = isset($body['clock_inc']) ? intval($body['clock_inc']) : 0;
+    $base_min = max(0, min(600, $base_min));
+    $inc_sec  = max(0, min(120, $inc_sec));
+    $clock_enabled = $base_min > 0;
+    $base_ms = $base_min * 60 * 1000;
+    $inc_ms  = $inc_sec * 1000;
+
+    $page = isset($body['page']) ? esc_url_raw((string) $body['page']) : '';
 
     $now  = time();
-    $game = array(
-        'id'          => $id,
-        'fen'         => CHESS_DUELL_START_FEN,
-        'turn'        => 'w',
-        'moves'       => array(),
-        'white_token' => $wtoken,
-        'black_token' => null,
-        'white_name'  => $name,
-        'black_name'  => '',
-        'status'      => 'waiting',
-        'result'      => null,
-        'created'     => $now,
-        'updated'     => $now,
-    );
+    $game = chess_duell_normalize_game(array(
+        'id'            => $id,
+        'fen'           => CHESS_DUELL_START_FEN,
+        'turn'          => 'w',
+        'moves'         => array(),
+        'white_token'   => $wtoken,
+        'black_token'   => null,
+        'white_name'    => $name,
+        'black_name'    => '',
+        'white_email'   => $email,
+        'black_email'   => '',
+        'status'        => 'waiting',
+        'result'        => null,
+        'result_type'   => null,
+        'created'       => $now,
+        'updated'       => $now,
+        'clock_enabled' => $clock_enabled,
+        'clock_base'    => $base_ms,
+        'clock_inc'     => $inc_ms,
+        'white_ms'      => $base_ms,
+        'black_ms'      => $base_ms,
+        'clock_last'    => null,
+        'seen_w'        => null,
+        'seen_b'        => null,
+        'page'          => $page,
+    ));
 
     $games[$id] = $game;
     chess_duell_save_games($games);
@@ -230,9 +452,24 @@ function chess_duell_rest_get($req) {
     if (!isset($games[$id])) {
         return new WP_Error('chess_duell_not_found', 'Partie nicht gefunden oder abgelaufen.', array('status' => 404));
     }
-    // Pruning kann etwas entfernt haben -> speichern.
+
+    $game = $games[$id];
+
+    // Heartbeat: Token bestimmt die eigene Farbe -> Online-Zeit der Uhr buchen.
+    $token = (string) $req->get_param('t');
+    $color = null;
+    if ($token !== '' && hash_equals($game['white_token'], $token)) {
+        $color = 'w';
+    } elseif ($token !== '' && !empty($game['black_token']) && hash_equals($game['black_token'], $token)) {
+        $color = 'b';
+    }
+    if (!empty($game['clock_enabled'])) {
+        chess_duell_account_clock($game, $color, chess_duell_now_ms());
+    }
+
+    $games[$id] = $game;
     chess_duell_save_games($games);
-    return chess_duell_public_state($games[$id]);
+    return chess_duell_public_state($game);
 }
 
 function chess_duell_rest_join($req) {
@@ -247,23 +484,23 @@ function chess_duell_rest_join($req) {
     $token    = isset($body['token']) ? (string) $body['token'] : '';
     $hasName  = isset($body['name']);
     $name     = $hasName ? chess_duell_sanitize_name($body['name']) : '';
+    $hasEmail = isset($body['email']);
+    $email    = $hasEmail ? chess_duell_sanitize_email($body['email']) : '';
 
-    // Bekanntes Token (Weiß)? -> bestehende Farbe, ggf. Namen aktualisieren.
+    // Bekanntes Token (Weiß)? -> bestehende Farbe, ggf. Name/E-Mail aktualisieren.
     if ($token !== '' && hash_equals($game['white_token'], $token)) {
-        if ($hasName && $name !== '' && $name !== (isset($game['white_name']) ? $game['white_name'] : '')) {
-            $game['white_name'] = $name;
-            $games[$id] = $game;
-            chess_duell_save_games($games);
-        }
+        $changed = false;
+        if ($hasName && $name !== '' && $name !== $game['white_name']) { $game['white_name'] = $name; $changed = true; }
+        if ($hasEmail && $email !== $game['white_email']) { $game['white_email'] = $email; $changed = true; }
+        if ($changed) { $games[$id] = $game; chess_duell_save_games($games); }
         return array('color' => 'white', 'token' => $token, 'state' => chess_duell_public_state($game));
     }
     // Bekanntes Token (Schwarz)?
     if ($token !== '' && !empty($game['black_token']) && hash_equals($game['black_token'], $token)) {
-        if ($hasName && $name !== '' && $name !== (isset($game['black_name']) ? $game['black_name'] : '')) {
-            $game['black_name'] = $name;
-            $games[$id] = $game;
-            chess_duell_save_games($games);
-        }
+        $changed = false;
+        if ($hasName && $name !== '' && $name !== $game['black_name']) { $game['black_name'] = $name; $changed = true; }
+        if ($hasEmail && $email !== $game['black_email']) { $game['black_email'] = $email; $changed = true; }
+        if ($changed) { $games[$id] = $game; chess_duell_save_games($games); }
         return array('color' => 'black', 'token' => $token, 'state' => chess_duell_public_state($game));
     }
 
@@ -274,11 +511,23 @@ function chess_duell_rest_join($req) {
         } catch (Exception $e) {
             return new WP_Error('chess_duell_rng', 'Zufallsgenerator nicht verfügbar.', array('status' => 500));
         }
+        $now = chess_duell_now_ms();
         $game['black_token'] = $btoken;
         $game['black_name']  = ($name !== '') ? $name : chess_duell_default_name();
+        $game['black_email'] = $email;
         $game['status']      = ($game['status'] === 'waiting') ? 'active' : $game['status'];
         $game['updated']     = time();
-        $games[$id]          = $game;
+        // Schachuhr startet jetzt (Weiß am Zug); Anwesenheit initialisieren.
+        if (!empty($game['clock_enabled'])) {
+            $game['clock_last'] = $now;
+            $game['seen_w']     = $now;
+            $game['seen_b']     = $now;
+        }
+        $games[$id] = $game;
+        chess_duell_save_games($games);
+        // Weiß ist am Zug -> ggf. benachrichtigen, dass der Gegner da ist.
+        chess_duell_notify_turn($game, 'w');
+        $games[$id] = $game; // notify kann last_notify_w gesetzt haben
         chess_duell_save_games($games);
         return array('color' => 'black', 'token' => $btoken, 'state' => chess_duell_public_state($game));
     }
@@ -333,6 +582,18 @@ function chess_duell_rest_move($req) {
         $promotion = null;
     }
 
+    // Schachuhr: Online-Zeit des Ziehenden bis jetzt verbuchen. Ist die Zeit
+    // dabei abgelaufen, endet die Partie und der Zug wird verworfen.
+    $now = chess_duell_now_ms();
+    if (!empty($game['clock_enabled'])) {
+        chess_duell_account_clock($game, $color, $now);
+        if ($game['status'] === 'finished') {
+            $games[$id] = $game;
+            chess_duell_save_games($games);
+            return chess_duell_public_state($game);
+        }
+    }
+
     // --- Serverseitige Regelprüfung ---------------------------------
     // Der Server ist die einzige Wahrheit: Er lädt die gespeicherte
     // Stellung, prüft die Legalität des Zuges selbst und berechnet
@@ -361,17 +622,41 @@ function chess_duell_rest_move($req) {
     $game['updated'] = time();
 
     $status = $engine->gameStatus();
-    if (!empty($status['over'])) {
+    $over   = !empty($status['over']);
+    if ($over) {
         $game['status'] = 'finished';
         if ($status['type'] === 'checkmate') {
             $game['result'] = ($status['winner'] === 'w') ? '1-0' : '0-1';
         } else {
             $game['result'] = '1/2-1/2';
         }
+        $game['result_type'] = $status['type'];
+    }
+
+    // Schachuhr: Inkrement gutschreiben und Uhr an den Gegner übergeben.
+    if (!empty($game['clock_enabled']) && !$over) {
+        if ($color === 'w') {
+            $game['white_ms'] = intval($game['white_ms']) + intval($game['clock_inc']);
+        } else {
+            $game['black_ms'] = intval($game['black_ms']) + intval($game['clock_inc']);
+        }
+        $game['clock_last'] = $now; // Uhr des nun ziehenden Gegners startet
+    }
+
+    if ($over) {
+        chess_duell_clear_emails($game);
     }
 
     $games[$id] = $game;
     chess_duell_save_games($games);
+
+    // Gegner ist jetzt am Zug -> benachrichtigen (sofern Partie nicht beendet).
+    if (!$over) {
+        $opp = ($color === 'w') ? 'b' : 'w';
+        chess_duell_notify_turn($game, $opp);
+        $games[$id] = $game; // notify kann den Spam-Schutz-Zeitstempel ändern
+        chess_duell_save_games($games);
+    }
 
     return chess_duell_public_state($game);
 }
@@ -398,10 +683,12 @@ function chess_duell_rest_resign($req) {
     }
 
     if ($game['status'] !== 'finished') {
-        $game['status']  = 'finished';
-        $game['result']  = ($color === 'w') ? '0-1' : '1-0';
-        $game['updated'] = time();
-        $games[$id]      = $game;
+        $game['status']      = 'finished';
+        $game['result']      = ($color === 'w') ? '0-1' : '1-0';
+        $game['result_type'] = 'resign';
+        $game['updated']     = time();
+        chess_duell_clear_emails($game);
+        $games[$id]          = $game;
         chess_duell_save_games($games);
     }
 
@@ -499,11 +786,12 @@ function chess_duell_shortcode($atts) {
     $game_id = isset($_GET['chess_game']) ? preg_replace('/[^a-f0-9]/', '', (string) $_GET['chess_game']) : '';
 
     wp_localize_script('chess-duell-app', 'ChessDuellConfig', array(
-        'restUrl'  => esc_url_raw(rest_url('chess-duell/v1/')),
-        'nonce'    => wp_create_nonce('wp_rest'),
-        'gameId'   => $game_id ? $game_id : null,
-        'userName' => chess_duell_default_name(),
-        'loggedIn' => is_user_logged_in(),
+        'restUrl'   => esc_url_raw(rest_url('chess-duell/v1/')),
+        'nonce'     => wp_create_nonce('wp_rest'),
+        'gameId'    => $game_id ? $game_id : null,
+        'userName'  => chess_duell_default_name(),
+        'userEmail' => chess_duell_default_email(),
+        'loggedIn'  => is_user_logged_in(),
     ));
 
     return '<div class="chess-duell-root"></div>';

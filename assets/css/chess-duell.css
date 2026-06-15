@@ -82,6 +82,19 @@
 .cd-name-edit { margin-bottom: 0.6em; }
 .cd-name-label { display: block; font-size: 0.8em; color: #666; margin-bottom: 0.1em; }
 
+.cd-field-label { display: block; font-size: 0.85em; font-weight: 600; color: #444; margin: 0.6em 0 0.1em; text-align: left; }
+.cd-select { width: 100%; padding: 0.45em; font-size: 0.9em; border: 1px solid #ccc; border-radius: 4px; margin: 0.3em 0; background: #fff; }
+.cd-hint { font-size: 0.78em; color: #777; text-align: left; margin: 0.15em 0 0.2em; line-height: 1.35; }
+
+/* Schachuhr */
+.cd-clocks { grid-column: 1 / -1; display: flex; gap: 0.6em; }
+.cd-clock { flex: 1; display: flex; justify-content: space-between; align-items: center;
+  padding: 0.4em 0.7em; border: 1px solid #ddd; border-radius: 6px; background: #fafafa; }
+.cd-clock-name { font-weight: 600; font-size: 0.9em; }
+.cd-clock-time { font-variant-numeric: tabular-nums; font-size: 1.25em; font-weight: 700; letter-spacing: 0.02em; }
+.cd-clock-run { background: #e8f5e9; border-color: #66bb6a; }
+.cd-clock-run .cd-clock-time { color: #1b5e20; }
+
 .cd-promo { position: fixed; left: 50%; top: 40%; transform: translate(-50%, -50%);
   background: #fff; border: 2px solid #333; border-radius: 10px; padding: 1em; z-index: 9999;
   box-shadow: 0 8px 30px rgba(0,0,0,0.3); text-align: center; }
