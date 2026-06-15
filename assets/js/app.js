@@ -367,6 +367,11 @@
     var st = this.engine.gameStatus();
     if (st.check) { kingInCheck = this.engine.kingSquare(this.engine.turn); }
 
+    // Felder des letzten Zuges (von/nach) leicht hervorheben.
+    var lastFrom = null, lastTo = null;
+    var mv = this.state && this.state.moves;
+    if (mv && mv.length) { lastFrom = mv[mv.length - 1].from; lastTo = mv[mv.length - 1].to; }
+
     for (var ri = 0; ri < rows.length; ri++) {
       var r = rows[ri];
       for (var ci = 0; ci < cols.length; ci++) {
@@ -380,6 +385,7 @@
           var pe = el('span', 'cd-piece cd-' + (piece[0] === 'w' ? 'white' : 'black'), GLYPH[piece[1]]);
           cell.appendChild(pe);
         }
+        if (square === lastFrom || square === lastTo) { cell.classList.add('cd-last'); }
         if (this.selected === square) { cell.classList.add('cd-selected'); }
         if (legalTargets[square]) { cell.classList.add(piece ? 'cd-capture' : 'cd-target'); }
         if (kingInCheck && kingInCheck.r === r && kingInCheck.c === c) { cell.classList.add('cd-check'); }
@@ -614,12 +620,17 @@
     var ml = this.moveListEl; if (!ml) { return; }
     ml.innerHTML = '';
     var moves = (this.state && this.state.moves) || [];
+    var last = moves.length - 1;
     for (var i = 0; i < moves.length; i += 2) {
       var row = el('div', 'cd-move-row');
       row.appendChild(el('span', 'cd-move-no', (i / 2 + 1) + '.'));
-      row.appendChild(el('span', 'cd-move-san', moves[i].san || (moves[i].from + moves[i].to)));
+      var w = el('span', 'cd-move-san' + (i === last ? ' cd-move-last' : ''),
+        moves[i].san || (moves[i].from + moves[i].to));
+      row.appendChild(w);
       if (moves[i + 1]) {
-        row.appendChild(el('span', 'cd-move-san', moves[i + 1].san || (moves[i + 1].from + moves[i + 1].to)));
+        var bl = el('span', 'cd-move-san' + (i + 1 === last ? ' cd-move-last' : ''),
+          moves[i + 1].san || (moves[i + 1].from + moves[i + 1].to));
+        row.appendChild(bl);
       }
       ml.appendChild(row);
     }
