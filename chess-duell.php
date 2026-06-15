@@ -3,7 +3,7 @@
  * Plugin Name:       Chess Duell
  * Plugin URI:        https://willnat.org/
  * Description:        Zwei Menschen spielen online Schach gegeneinander – Partie einfach per Link teilen. Anzahl gleichzeitiger Partien und Laufzeit im Backend einstellbar. Serverseitige Regelprüfung (kein Cheaten möglich), keine KI. Einbinden mit dem Shortcode [chess_duell].
- * Version:           1.2.0
+ * Version:           1.3.0
  * Author:            Florian Willnat
  * License:           GPL-2.0-or-later
  * License URI:       https://www.gnu.org/licenses/gpl-2.0.html
@@ -14,7 +14,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('CHESS_DUELL_VERSION', '1.2.0');
+define('CHESS_DUELL_VERSION', '1.3.0');
 define('CHESS_DUELL_URL', plugin_dir_url(__FILE__));
 define('CHESS_DUELL_PATH', plugin_dir_path(__FILE__));
 define('CHESS_DUELL_OPTION', 'chess_duell_games');
@@ -105,6 +105,14 @@ function chess_duell_valid_square($s) {
     return is_string($s) && preg_match('/^[a-h][1-8]$/', $s) === 1;
 }
 
+/** Anzeigename des angemeldeten WP-Nutzers (sonst leer). */
+function chess_duell_default_name() {
+    if (is_user_logged_in()) {
+        return chess_duell_sanitize_name(wp_get_current_user()->display_name);
+    }
+    return '';
+}
+
 /** Spielernamen bereinigen und auf 24 Zeichen begrenzen. */
 function chess_duell_sanitize_name($name) {
     $name = sanitize_text_field((string) $name);
@@ -158,19 +166,22 @@ add_action('rest_api_init', function () {
 function chess_duell_rest_create($req) {
     $games = chess_duell_prune(chess_duell_load_games());
 
-    $max = chess_duell_max_games();
-    $active = 0;
-    foreach ($games as $g) {
-        if ($g['status'] !== 'finished') {
-            $active++;
+    // Angemeldete WordPress-Nutzer (jede Rolle) dürfen das Limit übergehen.
+    if (!is_user_logged_in()) {
+        $max = chess_duell_max_games();
+        $active = 0;
+        foreach ($games as $g) {
+            if ($g['status'] !== 'finished') {
+                $active++;
+            }
         }
-    }
-    if ($active >= $max) {
-        return new WP_Error(
-            'chess_duell_full',
-            'Es laufen bereits ' . $max . ' Partien gleichzeitig. Bitte später erneut versuchen.',
-            array('status' => 503)
-        );
+        if ($active >= $max) {
+            return new WP_Error(
+                'chess_duell_full',
+                'Es laufen bereits ' . $max . ' Partien gleichzeitig. Bitte später erneut versuchen.',
+                array('status' => 503)
+            );
+        }
     }
 
     try {
@@ -182,6 +193,9 @@ function chess_duell_rest_create($req) {
 
     $body = $req->get_json_params();
     $name = chess_duell_sanitize_name(isset($body['name']) ? $body['name'] : '');
+    if ($name === '') {
+        $name = chess_duell_default_name(); // ggf. WP-Anzeigename
+    }
 
     $now  = time();
     $game = array(
@@ -261,7 +275,7 @@ function chess_duell_rest_join($req) {
             return new WP_Error('chess_duell_rng', 'Zufallsgenerator nicht verfügbar.', array('status' => 500));
         }
         $game['black_token'] = $btoken;
-        $game['black_name']  = $name;
+        $game['black_name']  = ($name !== '') ? $name : chess_duell_default_name();
         $game['status']      = ($game['status'] === 'waiting') ? 'active' : $game['status'];
         $game['updated']     = time();
         $games[$id]          = $game;
@@ -447,7 +461,7 @@ function chess_duell_settings_page() {
                         <input name="<?php echo esc_attr(CHESS_DUELL_SETTINGS); ?>[max_games]" id="cd-max"
                                type="number" min="1" max="200" step="1"
                                value="<?php echo esc_attr($s['max_games']); ?>" class="small-text">
-                        <p class="description">Wie viele laufende Partien gleichzeitig erlaubt sind (1–200). Beendete Partien zählen nicht mit.</p>
+                        <p class="description">Wie viele laufende Partien gleichzeitig erlaubt sind (1–200). Beendete Partien zählen nicht mit. Angemeldete WordPress-Nutzer dürfen dieses Limit übergehen.</p>
                     </td>
                 </tr>
                 <tr>
@@ -485,9 +499,11 @@ function chess_duell_shortcode($atts) {
     $game_id = isset($_GET['chess_game']) ? preg_replace('/[^a-f0-9]/', '', (string) $_GET['chess_game']) : '';
 
     wp_localize_script('chess-duell-app', 'ChessDuellConfig', array(
-        'restUrl' => esc_url_raw(rest_url('chess-duell/v1/')),
-        'nonce'   => wp_create_nonce('wp_rest'),
-        'gameId'  => $game_id ? $game_id : null,
+        'restUrl'  => esc_url_raw(rest_url('chess-duell/v1/')),
+        'nonce'    => wp_create_nonce('wp_rest'),
+        'gameId'   => $game_id ? $game_id : null,
+        'userName' => chess_duell_default_name(),
+        'loggedIn' => is_user_logged_in(),
     ));
 
     return '<div class="chess-duell-root"></div>';

@@ -43,6 +43,11 @@
   function saveName(n) {
     try { localStorage.setItem('chessduell_name', n); } catch (e) {}
   }
+  // Vorbelegung: selbst gewählter Name (Override) hat Vorrang, sonst der
+  // WordPress-Anzeigename angemeldeter Nutzer.
+  function defaultName() {
+    return loadName() || (CFG.userName || '');
+  }
 
   function ChessDuell(root) {
     this.root = root;
@@ -79,7 +84,7 @@
     nameInput.type = 'text';
     nameInput.maxLength = 24;
     nameInput.placeholder = 'Dein Name (optional)';
-    nameInput.value = loadName();
+    nameInput.value = defaultName();
     box.appendChild(nameInput);
 
     var btn = el('button', 'cd-btn cd-btn-primary', 'Neue Partie starten');
@@ -118,7 +123,7 @@
     var ident = loadIdentity(id);
     var body = {};
     if (ident && ident.token) { body.token = ident.token; }
-    var myName = loadName();
+    var myName = defaultName();
     if (myName) { body.name = myName; }
     this.root.innerHTML = '<div class="cd-msg">Verbinde mit Partie ...</div>';
     api('game/' + id + '/join', 'POST', body).then(function (data) {
@@ -192,7 +197,7 @@
       var ownName = this.color === 'white'
         ? (this.state && this.state.white_name)
         : (this.state && this.state.black_name);
-      nameField.value = ownName || loadName();
+      nameField.value = ownName || defaultName();
       nameField.addEventListener('change', function () { self.saveOwnName(this.value); });
       nameWrap.appendChild(nameField);
       controls.appendChild(nameWrap);

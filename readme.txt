@@ -4,7 +4,7 @@ Tags: chess, schach, game, multiplayer, spiel
 Requires at least: 5.6
 Tested up to: 6.8
 Requires PHP: 7.2
-Stable tag: 1.2.0
+Stable tag: 1.3.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -20,7 +20,10 @@ Funktionen:
 * Mensch gegen Mensch über einen geteilten Link (Hash in der URL: ?chess_game=...)
 * Wer die Partie erstellt, spielt Weiß; der zweite Besucher wird automatisch Schwarz.
   Weitere Besucher sehen die Partie als Zuschauer.
-* Spieler können sich einen eigenen Namen geben.
+* Spieler können sich einen eigenen Namen geben. Bei angemeldeten WordPress-
+  Nutzern ist der Anzeigename vorausgefüllt (überschreibbar).
+* Angemeldete WordPress-Nutzer (jede Rolle) dürfen das Limit gleichzeitiger
+  Partien übergehen.
 * Vollständige Schachregeln: Rochade, En passant, Bauernumwandlung,
   Schach/Schachmatt/Patt, 50-Züge-Regel, unzureichendes Material.
 * Serverseitige Regelprüfung: Jeder Zug wird auf dem Server validiert
@@ -51,6 +54,10 @@ illegalen Zug durchsetzen. Spieler-Identitäten werden über ein geheimes Token
 im Link/Local-Storage des Browsers verwaltet.
 
 == Changelog ==
+
+= 1.3.0 =
+* Angemeldete WordPress-Nutzer dürfen das Partien-Limit übergehen.
+* Anzeigename angemeldeter Nutzer wird als Spielername vorausgefüllt (überschreibbar).
 
 = 1.2.0 =
 * Serverseitige Regelprüfung (eigene PHP-Engine) – Cheaten nicht mehr möglich.
