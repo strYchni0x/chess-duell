@@ -30,9 +30,10 @@
 .cd-btn-danger:hover { background: #fdecea; }
 
 .cd-game { display: grid; grid-template-columns: minmax(280px, 1fr) 200px; gap: 1em; align-items: start; }
-.cd-status { grid-column: 1 / -1; display: flex; justify-content: space-between; gap: 1em;
-  padding: 0.6em 0.9em; background: #f3f3f3; border-radius: 6px; flex-wrap: wrap; }
+.cd-status { grid-column: 1 / -1; display: flex; justify-content: space-between; gap: 0.6em 1em;
+  padding: 0.6em 0.9em; background: #f3f3f3; border-radius: 6px; flex-wrap: wrap; align-items: center; }
 .cd-status .cd-you { font-weight: 600; }
+.cd-status .cd-players { color: #444; font-weight: 600; }
 .cd-status .cd-turn { color: #333; }
 .cd-status-over { background: #fff3cd; }
 .cd-status-over .cd-turn { font-weight: 700; }
@@ -76,6 +77,10 @@
 .cd-controls { margin-top: 0.8em; }
 .cd-share { margin-bottom: 0.6em; }
 .cd-link { width: 100%; padding: 0.4em; font-size: 0.8em; border: 1px solid #ccc; border-radius: 4px; margin: 0.3em 0; }
+
+.cd-name-input { width: 100%; padding: 0.45em; font-size: 0.9em; border: 1px solid #ccc; border-radius: 4px; margin: 0.3em 0; }
+.cd-name-edit { margin-bottom: 0.6em; }
+.cd-name-label { display: block; font-size: 0.8em; color: #666; margin-bottom: 0.1em; }
 
 .cd-promo { position: fixed; left: 50%; top: 40%; transform: translate(-50%, -50%);
   background: #fff; border: 2px solid #333; border-radius: 10px; padding: 1em; z-index: 9999;

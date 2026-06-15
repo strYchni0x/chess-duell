@@ -37,6 +37,12 @@
   function saveIdentity(id, data) {
     try { localStorage.setItem(storeKey(id), JSON.stringify(data)); } catch (e) {}
   }
+  function loadName() {
+    try { return localStorage.getItem('chessduell_name') || ''; } catch (e) { return ''; }
+  }
+  function saveName(n) {
+    try { localStorage.setItem('chessduell_name', n); } catch (e) {}
+  }
 
   function ChessDuell(root) {
     this.root = root;
@@ -68,13 +74,23 @@
     box.appendChild(el('h2', null, 'Schach – Online gegeneinander spielen'));
     box.appendChild(el('p', 'cd-muted',
       'Starte eine neue Partie und teile den Link mit deinem Gegner. Wer den Link erstellt, spielt Weiß.'));
+
+    var nameInput = el('input', 'cd-name-input');
+    nameInput.type = 'text';
+    nameInput.maxLength = 24;
+    nameInput.placeholder = 'Dein Name (optional)';
+    nameInput.value = loadName();
+    box.appendChild(nameInput);
+
     var btn = el('button', 'cd-btn cd-btn-primary', 'Neue Partie starten');
     var msg = el('div', 'cd-msg');
     var self = this;
     btn.addEventListener('click', function () {
       btn.disabled = true;
       msg.textContent = 'Erstelle Partie ...';
-      api('game', 'POST', {}).then(function (data) {
+      var nm = nameInput.value.trim();
+      saveName(nm);
+      api('game', 'POST', { name: nm }).then(function (data) {
         saveIdentity(data.id, { token: data.token, color: data.color });
         var url = self.gameUrl(data.id);
         history.replaceState(null, '', url);
@@ -100,7 +116,10 @@
     var self = this;
     this.gameId = id;
     var ident = loadIdentity(id);
-    var body = ident && ident.token ? { token: ident.token } : {};
+    var body = {};
+    if (ident && ident.token) { body.token = ident.token; }
+    var myName = loadName();
+    if (myName) { body.name = myName; }
     this.root.innerHTML = '<div class="cd-msg">Verbinde mit Partie ...</div>';
     api('game/' + id + '/join', 'POST', body).then(function (data) {
       self.color = data.color;
@@ -164,6 +183,20 @@
     controls.appendChild(this.shareBox);
 
     if (this.color === 'white' || this.color === 'black') {
+      var nameWrap = el('div', 'cd-name-edit');
+      nameWrap.appendChild(el('label', 'cd-name-label', 'Dein Name'));
+      var nameField = el('input', 'cd-name-input');
+      nameField.type = 'text';
+      nameField.maxLength = 24;
+      nameField.placeholder = this.color === 'white' ? 'Weiß' : 'Schwarz';
+      var ownName = this.color === 'white'
+        ? (this.state && this.state.white_name)
+        : (this.state && this.state.black_name);
+      nameField.value = ownName || loadName();
+      nameField.addEventListener('change', function () { self.saveOwnName(this.value); });
+      nameWrap.appendChild(nameField);
+      controls.appendChild(nameWrap);
+
       this.resignBtn = el('button', 'cd-btn cd-btn-danger', 'Aufgeben');
       this.resignBtn.addEventListener('click', function () { self.resign(); });
       controls.appendChild(this.resignBtn);
@@ -344,18 +377,28 @@
     this.updateStatus();
     this.updateMoveList();
 
+    // Der Server validiert den Zug selbst und liefert den maßgeblichen Zustand.
     api('game/' + this.gameId + '/move', 'POST', {
-      token: this.token, from: from, to: to, promotion: promotion,
-      san: move.san, fen: this.engine.fen(),
-      finished: finished, result: result
+      token: this.token, from: from, to: to, promotion: promotion
     }).then(function (data) {
       self.applyState(data);
       self.refreshUI();
     }).catch(function (e) {
-      // Konflikt: Serverzustand neu laden
+      // Konflikt / serverseitig abgelehnt: maßgeblichen Zustand neu laden
       self.fetchState();
       console.warn('Zug abgelehnt:', e.message);
     });
+  };
+
+  ChessDuell.prototype.saveOwnName = function (value) {
+    var self = this;
+    var nm = (value || '').trim();
+    saveName(nm);
+    if (!this.token) { return; }
+    api('game/' + this.gameId + '/join', 'POST', { token: this.token, name: nm }).then(function (data) {
+      if (data && data.state) { self.state = data.state; }
+      self.updateStatus();
+    }).catch(function (e) { console.warn(e.message); });
   };
 
   ChessDuell.prototype.resign = function () {
@@ -372,6 +415,10 @@
   ChessDuell.prototype.updateStatus = function () {
     var s = this.statusBar; if (!s) { return; }
     var st = this.engine.gameStatus();
+    var wName = (this.state && this.state.white_name) ? this.state.white_name : 'Weiß';
+    var bName = (this.state && this.state.black_name) ? this.state.black_name
+              : ((this.state && this.state.has_black) ? 'Schwarz' : '—');
+
     var youAre = this.color === 'white' ? 'Du spielst Weiß' :
                  this.color === 'black' ? 'Du spielst Schwarz' : 'Zuschauer';
     var line2 = '';
@@ -379,12 +426,12 @@
 
     if (this.state && this.state.status === 'finished') {
       var res = this.state.result;
-      if (res === '1-0') { line2 = 'Schachmatt / Aufgabe – Weiß gewinnt'; }
-      else if (res === '0-1') { line2 = 'Schachmatt / Aufgabe – Schwarz gewinnt'; }
+      if (res === '1-0') { line2 = 'Sieg – ' + wName + ' gewinnt'; }
+      else if (res === '0-1') { line2 = 'Sieg – ' + bName + ' gewinnt'; }
       else { line2 = 'Remis'; }
       cls += ' cd-status-over';
     } else if (st.over) {
-      if (st.type === 'checkmate') { line2 = 'Schachmatt – ' + (st.winner === 'w' ? 'Weiß' : 'Schwarz') + ' gewinnt'; }
+      if (st.type === 'checkmate') { line2 = 'Schachmatt – ' + (st.winner === 'w' ? wName : bName) + ' gewinnt'; }
       else if (st.type === 'stalemate') { line2 = 'Patt – Remis'; }
       else if (st.type === 'fiftymove') { line2 = '50-Züge-Regel – Remis'; }
       else { line2 = 'Remis (unzureichendes Material)'; }
@@ -392,13 +439,14 @@
     } else if (!this.state || !this.state.has_black) {
       line2 = 'Warte auf den Gegner ...';
     } else {
-      var turnTxt = this.engine.turn === 'w' ? 'Weiß' : 'Schwarz';
-      line2 = 'Am Zug: ' + turnTxt + (this.myTurn() ? ' (du)' : '');
+      var turnName = this.engine.turn === 'w' ? wName : bName;
+      line2 = 'Am Zug: ' + turnName + (this.myTurn() ? ' (du)' : '');
       if (st.check) { line2 += ' – Schach!'; }
     }
     s.className = cls;
     s.innerHTML = '';
     s.appendChild(el('span', 'cd-you', youAre));
+    s.appendChild(el('span', 'cd-players', '♔ ' + wName + '  vs  ♚ ' + bName));
     s.appendChild(el('span', 'cd-turn', line2));
   };
 

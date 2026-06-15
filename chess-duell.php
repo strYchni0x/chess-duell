@@ -2,8 +2,8 @@
 /**
  * Plugin Name:       Chess Duell
  * Plugin URI:        https://willnat.org/
- * Description:        Zwei Menschen spielen online Schach gegeneinander – Partie einfach per Link teilen. Bis zu 10 gleichzeitige Partien. Vollständige Schachregeln, keine KI. Einbinden mit dem Shortcode [chess_duell].
- * Version:           1.0.0
+ * Description:        Zwei Menschen spielen online Schach gegeneinander – Partie einfach per Link teilen. Anzahl gleichzeitiger Partien und Laufzeit im Backend einstellbar. Serverseitige Regelprüfung (kein Cheaten möglich), keine KI. Einbinden mit dem Shortcode [chess_duell].
+ * Version:           1.2.0
  * Author:            Florian Willnat
  * License:           GPL-2.0-or-later
  * License URI:       https://www.gnu.org/licenses/gpl-2.0.html
@@ -14,14 +14,46 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('CHESS_DUELL_VERSION', '1.0.0');
+define('CHESS_DUELL_VERSION', '1.2.0');
 define('CHESS_DUELL_URL', plugin_dir_url(__FILE__));
 define('CHESS_DUELL_PATH', plugin_dir_path(__FILE__));
 define('CHESS_DUELL_OPTION', 'chess_duell_games');
-define('CHESS_DUELL_MAX_GAMES', 10);             // maximal gleichzeitige Partien
-define('CHESS_DUELL_TTL', 14 * DAY_IN_SECONDS);  // Partie verfällt erst nach 14 Tagen Inaktivität
+define('CHESS_DUELL_SETTINGS', 'chess_duell_settings');
+
+define('CHESS_DUELL_DEFAULT_MAX_GAMES', 10); // Standard: max. gleichzeitige Partien
+define('CHESS_DUELL_DEFAULT_TTL_DAYS', 14);  // Standard: Tage bis eine inaktive Partie verfällt
 
 define('CHESS_DUELL_START_FEN', 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1');
+
+require_once CHESS_DUELL_PATH . 'includes/class-chess-engine.php';
+
+/* ------------------------------------------------------------------ *
+ *  Einstellungen (im Backend konfigurierbar)
+ * ------------------------------------------------------------------ */
+
+function chess_duell_get_settings() {
+    $defaults = array(
+        'max_games' => CHESS_DUELL_DEFAULT_MAX_GAMES,
+        'ttl_days'  => CHESS_DUELL_DEFAULT_TTL_DAYS,
+    );
+    $s = get_option(CHESS_DUELL_SETTINGS, array());
+    if (!is_array($s)) {
+        $s = array();
+    }
+    return wp_parse_args($s, $defaults);
+}
+
+/** Maximal erlaubte gleichzeitige (laufende) Partien. */
+function chess_duell_max_games() {
+    $s = chess_duell_get_settings();
+    return max(1, intval($s['max_games']));
+}
+
+/** Inaktivitäts-Lebensdauer einer Partie in Sekunden. */
+function chess_duell_ttl() {
+    $s = chess_duell_get_settings();
+    return max(1, intval($s['ttl_days'])) * DAY_IN_SECONDS;
+}
 
 /* ------------------------------------------------------------------ *
  *  Speicher-Helfer
@@ -38,10 +70,11 @@ function chess_duell_save_games($games) {
 
 function chess_duell_prune($games) {
     $now = time();
+    $ttl = chess_duell_ttl();
     foreach ($games as $id => $game) {
         // Eine Partie wird nur durch Matt/Aufgabe/Remis beendet oder nach
-        // 14 Tagen ohne Aktivität (egal ob laufend oder beendet) entfernt.
-        if ($now - intval($game['updated']) > CHESS_DUELL_TTL) {
+        // Ablauf der eingestellten Inaktivitätsdauer (laufend wie beendet) entfernt.
+        if ($now - intval($game['updated']) > $ttl) {
             unset($games[$id]);
         }
     }
@@ -51,14 +84,16 @@ function chess_duell_prune($games) {
 /** Öffentliche Sicht eines Spiels (ohne geheime Tokens). */
 function chess_duell_public_state($game) {
     return array(
-        'id'        => $game['id'],
-        'fen'       => $game['fen'],
-        'turn'      => $game['turn'],
-        'moves'     => $game['moves'],
-        'status'    => $game['status'],
-        'result'    => $game['result'],
-        'has_black' => !empty($game['black_token']),
-        'updated'   => intval($game['updated']),
+        'id'         => $game['id'],
+        'fen'        => $game['fen'],
+        'turn'       => $game['turn'],
+        'moves'      => $game['moves'],
+        'status'     => $game['status'],
+        'result'     => $game['result'],
+        'has_black'  => !empty($game['black_token']),
+        'white_name' => isset($game['white_name']) ? $game['white_name'] : '',
+        'black_name' => isset($game['black_name']) ? $game['black_name'] : '',
+        'updated'    => intval($game['updated']),
     );
 }
 
@@ -70,14 +105,16 @@ function chess_duell_valid_square($s) {
     return is_string($s) && preg_match('/^[a-h][1-8]$/', $s) === 1;
 }
 
-function chess_duell_sanitize_fen($fen) {
-    if (!is_string($fen) || strlen($fen) > 100) {
-        return null;
+/** Spielernamen bereinigen und auf 24 Zeichen begrenzen. */
+function chess_duell_sanitize_name($name) {
+    $name = sanitize_text_field((string) $name);
+    $name = trim($name);
+    if (function_exists('mb_substr')) {
+        $name = mb_substr($name, 0, 24);
+    } else {
+        $name = substr($name, 0, 24);
     }
-    if (preg_match('/^[a-h1-8KQRBNPkqrbnp\/wb \-]+$/', $fen) !== 1) {
-        return null;
-    }
-    return $fen;
+    return $name;
 }
 
 /* ------------------------------------------------------------------ *
@@ -121,16 +158,17 @@ add_action('rest_api_init', function () {
 function chess_duell_rest_create($req) {
     $games = chess_duell_prune(chess_duell_load_games());
 
+    $max = chess_duell_max_games();
     $active = 0;
     foreach ($games as $g) {
         if ($g['status'] !== 'finished') {
             $active++;
         }
     }
-    if ($active >= CHESS_DUELL_MAX_GAMES) {
+    if ($active >= $max) {
         return new WP_Error(
             'chess_duell_full',
-            'Es laufen bereits ' . CHESS_DUELL_MAX_GAMES . ' Partien gleichzeitig. Bitte später erneut versuchen.',
+            'Es laufen bereits ' . $max . ' Partien gleichzeitig. Bitte später erneut versuchen.',
             array('status' => 503)
         );
     }
@@ -142,6 +180,9 @@ function chess_duell_rest_create($req) {
         return new WP_Error('chess_duell_rng', 'Zufallsgenerator nicht verfügbar.', array('status' => 500));
     }
 
+    $body = $req->get_json_params();
+    $name = chess_duell_sanitize_name(isset($body['name']) ? $body['name'] : '');
+
     $now  = time();
     $game = array(
         'id'          => $id,
@@ -150,6 +191,8 @@ function chess_duell_rest_create($req) {
         'moves'       => array(),
         'white_token' => $wtoken,
         'black_token' => null,
+        'white_name'  => $name,
+        'black_name'  => '',
         'status'      => 'waiting',
         'result'      => null,
         'created'     => $now,
@@ -185,15 +228,28 @@ function chess_duell_rest_join($req) {
         return new WP_Error('chess_duell_not_found', 'Partie nicht gefunden oder abgelaufen.', array('status' => 404));
     }
 
-    $game  = $games[$id];
-    $body  = $req->get_json_params();
-    $token = isset($body['token']) ? (string) $body['token'] : '';
+    $game     = $games[$id];
+    $body     = $req->get_json_params();
+    $token    = isset($body['token']) ? (string) $body['token'] : '';
+    $hasName  = isset($body['name']);
+    $name     = $hasName ? chess_duell_sanitize_name($body['name']) : '';
 
-    // Bekanntes Token? -> bestehende Farbe zurückgeben.
+    // Bekanntes Token (Weiß)? -> bestehende Farbe, ggf. Namen aktualisieren.
     if ($token !== '' && hash_equals($game['white_token'], $token)) {
+        if ($hasName && $name !== '' && $name !== (isset($game['white_name']) ? $game['white_name'] : '')) {
+            $game['white_name'] = $name;
+            $games[$id] = $game;
+            chess_duell_save_games($games);
+        }
         return array('color' => 'white', 'token' => $token, 'state' => chess_duell_public_state($game));
     }
+    // Bekanntes Token (Schwarz)?
     if ($token !== '' && !empty($game['black_token']) && hash_equals($game['black_token'], $token)) {
+        if ($hasName && $name !== '' && $name !== (isset($game['black_name']) ? $game['black_name'] : '')) {
+            $game['black_name'] = $name;
+            $games[$id] = $game;
+            chess_duell_save_games($games);
+        }
         return array('color' => 'black', 'token' => $token, 'state' => chess_duell_public_state($game));
     }
 
@@ -205,6 +261,7 @@ function chess_duell_rest_join($req) {
             return new WP_Error('chess_duell_rng', 'Zufallsgenerator nicht verfügbar.', array('status' => 500));
         }
         $game['black_token'] = $btoken;
+        $game['black_name']  = $name;
         $game['status']      = ($game['status'] === 'waiting') ? 'active' : $game['status'];
         $game['updated']     = time();
         $games[$id]          = $game;
@@ -262,33 +319,41 @@ function chess_duell_rest_move($req) {
         $promotion = null;
     }
 
-    $fen = chess_duell_sanitize_fen(isset($body['fen']) ? $body['fen'] : '');
-    if ($fen === null) {
-        return new WP_Error('chess_duell_bad_fen', 'Ungültige Stellung.', array('status' => 400));
+    // --- Serverseitige Regelprüfung ---------------------------------
+    // Der Server ist die einzige Wahrheit: Er lädt die gespeicherte
+    // Stellung, prüft die Legalität des Zuges selbst und berechnet
+    // FEN/SAN/Spielende neu. Vom Client gesendete fen/san/result werden
+    // bewusst ignoriert -> Cheaten ist nicht möglich.
+    $engine = new Chess_Duell_Engine($game['fen']);
+
+    // Sicherheitsnetz: Stellung am Zug muss zur Spieldatensatz-Farbe passen.
+    if ($engine->turn !== $game['turn']) {
+        return new WP_Error('chess_duell_state', 'Stellung inkonsistent.', array('status' => 409));
     }
 
-    $san = isset($body['san']) ? sanitize_text_field((string) $body['san']) : ($from . $to);
-    if (strlen($san) > 10) {
-        $san = substr($san, 0, 10);
+    $applied = $engine->move($from, $to, $promotion);
+    if ($applied === null) {
+        return new WP_Error('chess_duell_illegal', 'Ungültiger Zug.', array('status' => 422));
     }
 
     $game['moves'][] = array(
         'from'      => $from,
         'to'        => $to,
-        'promotion' => $promotion,
-        'san'       => $san,
+        'promotion' => $applied['promotion'],
+        'san'       => $applied['san'],
     );
-    $game['fen']     = $fen;
-    $game['turn']    = ($game['turn'] === 'w') ? 'b' : 'w';
+    $game['fen']     = $engine->fen();
+    $game['turn']    = $engine->turn;
     $game['updated'] = time();
 
-    if (!empty($body['finished'])) {
-        $result = isset($body['result']) ? (string) $body['result'] : null;
-        if (!in_array($result, array('1-0', '0-1', '1/2-1/2'), true)) {
-            $result = null;
-        }
+    $status = $engine->gameStatus();
+    if (!empty($status['over'])) {
         $game['status'] = 'finished';
-        $game['result'] = $result;
+        if ($status['type'] === 'checkmate') {
+            $game['result'] = ($status['winner'] === 'w') ? '1-0' : '0-1';
+        } else {
+            $game['result'] = '1/2-1/2';
+        }
     }
 
     $games[$id] = $game;
@@ -330,6 +395,79 @@ function chess_duell_rest_resign($req) {
 }
 
 /* ------------------------------------------------------------------ *
+ *  Backend-Einstellungen
+ * ------------------------------------------------------------------ */
+
+add_action('admin_menu', function () {
+    add_options_page(
+        'Chess Duell',
+        'Chess Duell',
+        'manage_options',
+        'chess-duell',
+        'chess_duell_settings_page'
+    );
+});
+
+add_action('admin_init', function () {
+    register_setting('chess_duell_group', CHESS_DUELL_SETTINGS, array(
+        'type'              => 'array',
+        'sanitize_callback' => 'chess_duell_sanitize_settings',
+        'default'           => array(
+            'max_games' => CHESS_DUELL_DEFAULT_MAX_GAMES,
+            'ttl_days'  => CHESS_DUELL_DEFAULT_TTL_DAYS,
+        ),
+    ));
+});
+
+function chess_duell_sanitize_settings($input) {
+    $out = array();
+    $out['max_games'] = isset($input['max_games']) ? intval($input['max_games']) : CHESS_DUELL_DEFAULT_MAX_GAMES;
+    $out['ttl_days']  = isset($input['ttl_days']) ? intval($input['ttl_days']) : CHESS_DUELL_DEFAULT_TTL_DAYS;
+    if ($out['max_games'] < 1)   { $out['max_games'] = 1; }
+    if ($out['max_games'] > 200) { $out['max_games'] = 200; }
+    if ($out['ttl_days'] < 1)    { $out['ttl_days'] = 1; }
+    if ($out['ttl_days'] > 365)  { $out['ttl_days'] = 365; }
+    return $out;
+}
+
+function chess_duell_settings_page() {
+    if (!current_user_can('manage_options')) {
+        return;
+    }
+    $s = chess_duell_get_settings();
+    ?>
+    <div class="wrap">
+        <h1>Chess Duell – Einstellungen</h1>
+        <form method="post" action="options.php">
+            <?php settings_fields('chess_duell_group'); ?>
+            <table class="form-table" role="presentation">
+                <tr>
+                    <th scope="row"><label for="cd-max">Maximale gleichzeitige Partien</label></th>
+                    <td>
+                        <input name="<?php echo esc_attr(CHESS_DUELL_SETTINGS); ?>[max_games]" id="cd-max"
+                               type="number" min="1" max="200" step="1"
+                               value="<?php echo esc_attr($s['max_games']); ?>" class="small-text">
+                        <p class="description">Wie viele laufende Partien gleichzeitig erlaubt sind (1–200). Beendete Partien zählen nicht mit.</p>
+                    </td>
+                </tr>
+                <tr>
+                    <th scope="row"><label for="cd-ttl">Laufzeit bis Auto-Ende (Tage)</label></th>
+                    <td>
+                        <input name="<?php echo esc_attr(CHESS_DUELL_SETTINGS); ?>[ttl_days]" id="cd-ttl"
+                               type="number" min="1" max="365" step="1"
+                               value="<?php echo esc_attr($s['ttl_days']); ?>" class="small-text">
+                        <p class="description">Nach so vielen Tagen ohne Aktivität wird eine Partie automatisch entfernt (1–365). Ansonsten endet eine Partie nur durch Matt, Aufgabe oder Remis.</p>
+                    </td>
+                </tr>
+            </table>
+            <?php submit_button(); ?>
+        </form>
+        <p><strong>Shortcode:</strong> <code>[chess_duell]</code></p>
+    </div>
+    <?php
+}
+
+/* ------------------------------------------------------------------ *
  *  Assets + Shortcode
  * ------------------------------------------------------------------ */
 
@@ -360,4 +498,5 @@ add_shortcode('chess_duell', 'chess_duell_shortcode');
 register_uninstall_hook(__FILE__, 'chess_duell_uninstall');
 function chess_duell_uninstall() {
     delete_option(CHESS_DUELL_OPTION);
+    delete_option(CHESS_DUELL_SETTINGS);
 }
