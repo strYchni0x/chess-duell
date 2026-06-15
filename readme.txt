@@ -1,5 +1,5 @@
 === Chess Duell ===
-Contributors: willnat
+Contributors: strychni0x
 Tags: chess, schach, game, multiplayer, spiel
 Requires at least: 5.6
 Tested up to: 6.8
