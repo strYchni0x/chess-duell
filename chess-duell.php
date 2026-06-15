@@ -3,7 +3,7 @@
  * Plugin Name:       Chess Duell
  * Plugin URI:        https://willnat.org/
  * Description:        Zwei Menschen spielen online Schach gegeneinander – Partie einfach per Link teilen. Anzahl gleichzeitiger Partien und Laufzeit im Backend einstellbar. Serverseitige Regelprüfung (kein Cheaten möglich), keine KI. Einbinden mit dem Shortcode [chess_duell].
- * Version:           1.4.0
+ * Version:           1.5.0
  * Author:            Florian Willnat
  * License:           GPL-2.0-or-later
  * License URI:       https://www.gnu.org/licenses/gpl-2.0.html
@@ -14,7 +14,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('CHESS_DUELL_VERSION', '1.3.0');
+define('CHESS_DUELL_VERSION', '1.5.0');
 define('CHESS_DUELL_URL', plugin_dir_url(__FILE__));
 define('CHESS_DUELL_PATH', plugin_dir_path(__FILE__));
 define('CHESS_DUELL_OPTION', 'chess_duell_games');
@@ -32,6 +32,21 @@ define('CHESS_DUELL_MAX_TICK_MS', 8000);      // max. anrechenbare Zeit pro Hear
 define('CHESS_DUELL_START_FEN', 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1');
 
 require_once CHESS_DUELL_PATH . 'includes/class-chess-engine.php';
+
+/* ------------------------------------------------------------------ *
+ *  GitHub-Updater
+ *  Meldet Updates aus dem GitHub-Repository im WordPress-Dashboard.
+ *  → Bei Umstieg auf wordpress.org diesen Block UND die Datei
+ *    includes/class-github-updater.php entfernen (siehe Hinweis dort).
+ * ------------------------------------------------------------------ */
+if (is_admin() || (defined('DOING_CRON') && DOING_CRON)) {
+    require_once CHESS_DUELL_PATH . 'includes/class-github-updater.php';
+    new Chess_Duell_GitHub_Updater(
+        __FILE__,
+        'strYchni0x/chess-duell',
+        defined('CHESS_DUELL_GITHUB_TOKEN') ? CHESS_DUELL_GITHUB_TOKEN : ''
+    );
+}
 
 /* ------------------------------------------------------------------ *
  *  Einstellungen (im Backend konfigurierbar)
