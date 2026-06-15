@@ -3,7 +3,7 @@
  * Plugin Name:       Chess Duell
  * Plugin URI:        https://github.com/strYchni0x/chess-duell
  * Description:        Zwei Menschen spielen online Schach gegeneinander – Partie einfach per Link teilen. Anzahl gleichzeitiger Partien und Laufzeit im Backend einstellbar. Serverseitige Regelprüfung (kein Cheaten möglich), keine KI. Einbinden mit dem Shortcode [chess_duell].
- * Version:           1.5.3
+ * Version:           1.5.4
  * Author:            Florian Willnat
  * License:           GPL-2.0-or-later
  * License URI:       https://www.gnu.org/licenses/gpl-2.0.html
@@ -14,7 +14,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('CHESS_DUELL_VERSION', '1.5.3');
+define('CHESS_DUELL_VERSION', '1.5.4');
 define('CHESS_DUELL_URL', plugin_dir_url(__FILE__));
 define('CHESS_DUELL_PATH', plugin_dir_path(__FILE__));
 define('CHESS_DUELL_OPTION', 'chess_duell_games');
@@ -800,16 +800,21 @@ function chess_duell_shortcode($atts) {
 
     $game_id = isset($_GET['chess_game']) ? preg_replace('/[^a-f0-9]/', '', (string) $_GET['chess_game']) : '';
 
-    wp_localize_script('chess-duell-app', 'ChessDuellConfig', array(
+    $config = array(
         'restUrl'   => esc_url_raw(rest_url('chess-duell/v1/')),
         'nonce'     => wp_create_nonce('wp_rest'),
         'gameId'    => $game_id ? $game_id : null,
         'userName'  => chess_duell_default_name(),
         'userEmail' => chess_duell_default_email(),
         'loggedIn'  => is_user_logged_in(),
-    ));
+    );
 
-    return '<div class="chess-duell-root"></div>';
+    // Konfiguration zusätzlich per wp_localize_script bereitstellen ...
+    wp_localize_script('chess-duell-app', 'ChessDuellConfig', $config);
+
+    // ... und – robust gegen CSP / Skript-Optimierer / Inline-Script-Stripping –
+    // direkt als data-Attribut am Container. app.js liest bevorzugt von hier.
+    return '<div class="chess-duell-root" data-config="' . esc_attr(wp_json_encode($config)) . '"></div>';
 }
 add_shortcode('chess_duell', 'chess_duell_shortcode');
 

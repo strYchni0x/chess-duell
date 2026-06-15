@@ -8,6 +8,16 @@
   var CFG = window.ChessDuellConfig || {};
   var POLL_MS = 2000;
 
+  // Konfiguration bevorzugt vom Container lesen (robust gegen CSP/Optimierer,
+  // die das per wp_localize_script erzeugte Inline-Script entfernen könnten).
+  function readConfig(root) {
+    try {
+      var raw = root && root.getAttribute && root.getAttribute('data-config');
+      if (raw) { CFG = JSON.parse(raw); }
+    } catch (e) { /* Fallback: window.ChessDuellConfig */ }
+    return CFG;
+  }
+
   var GLYPH = { k: '♚', q: '♛', r: '♜', b: '♝', n: '♞', p: '♟' };
   var PROMO_LABEL = { q: 'Dame', r: 'Turm', b: 'Läufer', n: 'Springer' };
 
@@ -82,6 +92,7 @@
 
   function ChessDuell(root) {
     this.root = root;
+    readConfig(root);
     this.engine = new Engine();
     this.gameId = null;
     this.token = null;
