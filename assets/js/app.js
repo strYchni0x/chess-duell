@@ -668,7 +668,9 @@
     var self = this;
     if (document.hidden) { return; }
     // Send the token as heartbeat so the server books the clock's online time.
-    var path = 'game/' + this.gameId + (this.token ? '?t=' + encodeURIComponent(this.token) : '');
+    // Separator depends on the REST base URL (plain permalinks already contain "?").
+    var sep = (CFG.restUrl && CFG.restUrl.indexOf('?') !== -1) ? '&' : '?';
+    var path = 'game/' + this.gameId + (this.token ? sep + 't=' + encodeURIComponent(this.token) : '');
     api(path).then(function (data) {
       var before = self.appliedMoves;
       var beforeBlack = self.state && self.state.has_black;
