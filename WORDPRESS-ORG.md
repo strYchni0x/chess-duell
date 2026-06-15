@@ -16,9 +16,23 @@ assets/css/chess-duell.css
 assets/js/app.js
 assets/js/engine.js
 includes/class-chess-engine.php
+languages/chess-duell.pot
+languages/chess-duell-de_DE.po
+languages/chess-duell-de_DE.mo
 ```
 
 (Kein `includes/class-github-updater.php` – wurde in diesem Branch entfernt.)
+
+## Internationalisierung (i18n)
+
+- Quelltexte sind Englisch; alle sichtbaren Strings sind über `__()` bzw. die
+  JS-i18n-Map (`chess_duell_js_i18n()` → `ChessDuellConfig.i18n`) übersetzbar.
+- `languages/chess-duell.pot` ist die Übersetzungsvorlage.
+- Deutsch liegt als `chess-duell-de_DE.po` (Quelle) + `chess-duell-de_DE.mo`
+  (kompiliert) bei und greift sofort.
+- Nach Freigabe können zusätzlich Übersetzer via translate.wordpress.org
+  (GlotPress) beitragen; die mitgelieferte .mo bleibt als Fallback.
+- `.po` geändert? Neu kompilieren, z. B. `msgfmt chess-duell-de_DE.po -o chess-duell-de_DE.mo` (oder Poedit).
 
 ## 1. Einreichen
 

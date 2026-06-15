@@ -1,0 +1,234 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: Chess Duell 1.5.1\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Language: de_DE\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"X-Domain: chess-duell\n"
+
+msgid "Play chess online against each other"
+msgstr "Schach – Online gegeneinander spielen"
+
+msgid "Start a new game and share the link with your opponent. Whoever creates the link plays White."
+msgstr "Starte eine neue Partie und teile den Link mit deinem Gegner. Wer den Link erstellt, spielt Weiß."
+
+msgid "Your name"
+msgstr "Dein Name"
+
+msgid "Your name (optional)"
+msgstr "Dein Name (optional)"
+
+msgid "Chess clock"
+msgstr "Schachuhr"
+
+msgid "No clock"
+msgstr "Ohne Uhr"
+
+msgid "5 minutes"
+msgstr "5 Minuten"
+
+msgid "10 minutes"
+msgstr "10 Minuten"
+
+msgid "15 min + 10 sec/move"
+msgstr "15 Min + 10 Sek/Zug"
+
+msgid "30 minutes"
+msgstr "30 Minuten"
+
+msgid "Only the online time of the player to move is counted. If someone is offline, their clock pauses."
+msgstr "Es zählt nur die Online-Zeit des Spielers am Zug. Ist jemand offline, pausiert seine Uhr."
+
+msgid "E-mail for move notification (optional)"
+msgstr "E-Mail für Zug-Benachrichtigung (optional)"
+
+msgid "Used only to notify you when it is your turn, and automatically deleted when the game ends – not stored permanently. Note: like any input, the address is technically visible in the server log."
+msgstr "Wird nur verwendet, um dich zu benachrichtigen, wenn du am Zug bist, und mit dem Spielende automatisch gelöscht – nicht dauerhaft gespeichert. Hinweis: Wie jede Eingabe ist die Adresse technisch im Server-Log sichtbar."
+
+msgid "Start new game"
+msgstr "Neue Partie starten"
+
+msgid "Creating game …"
+msgstr "Erstelle Partie …"
+
+msgid "Error: %s"
+msgstr "Fehler: %s"
+
+msgid "Connecting to game …"
+msgstr "Verbinde mit Partie …"
+
+msgid "Could not load game: %s"
+msgstr "Partie konnte nicht geladen werden: %s"
+
+msgid "Back to lobby"
+msgstr "Zurück zur Lobby"
+
+msgid "Move list"
+msgstr "Zugliste"
+
+msgid "White"
+msgstr "Weiß"
+
+msgid "Black"
+msgstr "Schwarz"
+
+msgid "E-mail notification"
+msgstr "E-Mail-Benachrichtigung"
+
+msgid "Notification when it is your turn. The address is deleted when the game ends, not stored permanently (visible in the server log). Empty field = off."
+msgstr "Benachrichtigung, wenn du am Zug bist. Adresse wird mit Spielende gelöscht, nicht dauerhaft gespeichert (im Server-Log sichtbar). Feld leeren = aus."
+
+msgid "Give up"
+msgstr "Aufgeben"
+
+msgid "New game"
+msgstr "Neue Partie"
+
+msgid "Promote to:"
+msgstr "Umwandeln in:"
+
+msgid "Queen"
+msgstr "Dame"
+
+msgid "Rook"
+msgstr "Turm"
+
+msgid "Bishop"
+msgstr "Läufer"
+
+msgid "Knight"
+msgstr "Springer"
+
+msgid "Both players are connected."
+msgstr "Beide Spieler sind verbunden."
+
+msgid "Share this link with your opponent:"
+msgstr "Teile diesen Link mit deinem Gegner:"
+
+msgid "Copy link"
+msgstr "Link kopieren"
+
+msgid "Copied!"
+msgstr "Kopiert!"
+
+msgid "You are watching as a spectator."
+msgstr "Du schaust als Zuschauer zu."
+
+msgid "You play White"
+msgstr "Du spielst Weiß"
+
+msgid "You play Black"
+msgstr "Du spielst Schwarz"
+
+msgid "Spectator"
+msgstr "Zuschauer"
+
+msgid "Draw"
+msgstr "Remis"
+
+msgid " (stalemate)"
+msgstr " (Patt)"
+
+msgid " (fifty-move rule)"
+msgstr " (50-Züge-Regel)"
+
+msgid " (insufficient material)"
+msgstr " (unzureichendes Material)"
+
+msgid "Victory – %s wins"
+msgstr "Sieg – %s gewinnt"
+
+msgid " (on time)"
+msgstr " (Zeit abgelaufen)"
+
+msgid " (by resignation)"
+msgstr " (Aufgabe)"
+
+msgid " (checkmate)"
+msgstr " (Schachmatt)"
+
+msgid "Game over"
+msgstr "Partie beendet"
+
+msgid "Checkmate – %s wins"
+msgstr "Schachmatt – %s gewinnt"
+
+msgid "Stalemate – draw"
+msgstr "Patt – Remis"
+
+msgid "Fifty-move rule – draw"
+msgstr "50-Züge-Regel – Remis"
+
+msgid "Draw (insufficient material)"
+msgstr "Remis (unzureichendes Material)"
+
+msgid "Waiting for opponent …"
+msgstr "Warte auf den Gegner …"
+
+msgid "On move: %s"
+msgstr "Am Zug: %s"
+
+msgid " (you)"
+msgstr " (du)"
+
+msgid " – Check!"
+msgstr " – Schach!"
+
+msgid "Really give up the game?"
+msgstr "Partie wirklich aufgeben?"
+
+msgid "Game not found or expired."
+msgstr "Partie nicht gefunden oder abgelaufen."
+
+msgid "Random number generator not available."
+msgstr "Zufallsgenerator nicht verfügbar."
+
+msgid "No valid player token."
+msgstr "Kein gültiges Spieler-Token."
+
+msgid "The game has already ended."
+msgstr "Die Partie ist bereits beendet."
+
+msgid "No opponent has connected yet."
+msgstr "Es ist noch kein Gegner verbunden."
+
+msgid "It is not your turn."
+msgstr "Du bist nicht am Zug."
+
+msgid "Invalid squares."
+msgstr "Ungültige Felder."
+
+msgid "Inconsistent position."
+msgstr "Stellung inkonsistent."
+
+msgid "Invalid move."
+msgstr "Ungültiger Zug."
+
+msgid "There are already %d games in progress at the same time. Please try again later."
+msgstr "Es laufen bereits %d Partien gleichzeitig. Bitte später erneut versuchen."
+
+msgid "Chess: it is your turn"
+msgstr "Schach: Du bist am Zug"
+
+msgid "Hello,\n\n%1$s has moved – it is your turn now.\n\nTo the game:\n%2$s\n\nNote: your address is used only for notifications of this game and is automatically deleted when the game ends. It is not stored permanently."
+msgstr "Hallo,\n\n%1$s hat gezogen – du bist jetzt am Zug.\n\nZur Partie:\n%2$s\n\nHinweis: Deine Adresse wird nur für Benachrichtigungen dieser Partie verwendet und mit dem Spielende automatisch gelöscht. Sie wird nicht dauerhaft gespeichert."
+
+msgid "Chess Duell – Settings"
+msgstr "Chess Duell – Einstellungen"
+
+msgid "Maximum concurrent games"
+msgstr "Maximale gleichzeitige Partien"
+
+msgid "How many games may run at the same time (1–200). Finished games do not count. Logged-in WordPress users may bypass this limit."
+msgstr "Wie viele laufende Partien gleichzeitig erlaubt sind (1–200). Beendete Partien zählen nicht mit. Angemeldete WordPress-Nutzer dürfen dieses Limit übergehen."
+
+msgid "Lifetime until auto-end (days)"
+msgstr "Laufzeit bis Auto-Ende (Tage)"
+
+msgid "After this many days without activity a game is removed automatically (1–365). Otherwise a game ends only by checkmate, resignation or draw."
+msgstr "Nach so vielen Tagen ohne Aktivität wird eine Partie automatisch entfernt (1–365). Ansonsten endet eine Partie nur durch Matt, Aufgabe oder Remis."
+
+msgid "Shortcode:"
+msgstr "Shortcode:"
+

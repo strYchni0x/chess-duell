@@ -1,15 +1,27 @@
 /**
- * Chess Duell – Front-End: Lobby, Brett-Rendering, Synchronisation per Polling.
+ * Chess Duell – front-end: lobby, board rendering, polling sync.
+ *
+ * All user-facing strings are English source strings passed through t()/tf(),
+ * which look them up in CFG.i18n (filled by PHP via wp_localize_script) and
+ * fall back to the English source. This keeps the plugin translatable with a
+ * single gettext catalog (.po/.mo) covering PHP and JS alike.
  */
 (function () {
   'use strict';
 
   var Engine = window.ChessDuellEngine;
   var CFG = window.ChessDuellConfig || {};
+  var I18N = CFG.i18n || {};
   var POLL_MS = 2000;
 
+  function t(s) { return (I18N && I18N[s]) || s; }
+  function tf(s) {
+    var str = t(s); var args = arguments; var i = 1;
+    return str.replace(/%s/g, function () { return args[i++]; });
+  }
+
   var GLYPH = { k: '♚', q: '♛', r: '♜', b: '♝', n: '♞', p: '♟' };
-  var PROMO_LABEL = { q: 'Dame', r: 'Turm', b: 'Läufer', n: 'Springer' };
+  var PROMO_LABEL = { q: 'Queen', r: 'Rook', b: 'Bishop', n: 'Knight' };
 
   function el(tag, cls, txt) {
     var e = document.createElement(tag);
@@ -43,8 +55,8 @@
   function saveName(n) {
     try { localStorage.setItem('chessduell_name', n); } catch (e) {}
   }
-  // Vorbelegung: selbst gewählter Name (Override) hat Vorrang, sonst der
-  // WordPress-Anzeigename angemeldeter Nutzer.
+  // Prefill: an explicitly chosen name (override) wins, otherwise the
+  // WordPress display name of logged-in users.
   function defaultName() {
     return loadName() || (CFG.userName || '');
   }
@@ -61,13 +73,13 @@
     return window.location.origin + window.location.pathname;
   }
 
-  // Schachuhr-Voreinstellungen (Basiszeit Minuten + Inkrement Sekunden je Zug).
+  // Chess clock presets (base minutes + increment seconds per move).
   var CLOCK_PRESETS = [
-    { label: 'Ohne Uhr', base: 0, inc: 0 },
-    { label: '5 Minuten', base: 5, inc: 0 },
-    { label: '10 Minuten', base: 10, inc: 0 },
-    { label: '15 Min + 10 Sek/Zug', base: 15, inc: 10 },
-    { label: '30 Minuten', base: 30, inc: 0 }
+    { label: 'No clock', base: 0, inc: 0 },
+    { label: '5 minutes', base: 5, inc: 0 },
+    { label: '10 minutes', base: 10, inc: 0 },
+    { label: '15 min + 10 sec/move', base: 15, inc: 10 },
+    { label: '30 minutes', base: 30, inc: 0 }
   ];
 
   function fmtClock(ms) {
@@ -111,46 +123,47 @@
     var r = this.root;
     r.innerHTML = '';
     var box = el('div', 'cd-lobby');
-    box.appendChild(el('h2', null, 'Schach – Online gegeneinander spielen'));
+    box.appendChild(el('h2', null, t('Play chess online against each other')));
     box.appendChild(el('p', 'cd-muted',
-      'Starte eine neue Partie und teile den Link mit deinem Gegner. Wer den Link erstellt, spielt Weiß.'));
+      t('Start a new game and share the link with your opponent. Whoever creates the link plays White.')));
 
+    box.appendChild(el('label', 'cd-field-label', t('Your name')));
     var nameInput = el('input', 'cd-name-input');
     nameInput.type = 'text';
     nameInput.maxLength = 24;
-    nameInput.placeholder = 'Dein Name (optional)';
+    nameInput.placeholder = t('Your name (optional)');
     nameInput.value = defaultName();
-    box.appendChild(el('label', 'cd-field-label', 'Dein Name'));
     box.appendChild(nameInput);
 
-    // Schachuhr
-    box.appendChild(el('label', 'cd-field-label', 'Schachuhr'));
+    // Chess clock
+    box.appendChild(el('label', 'cd-field-label', t('Chess clock')));
     var clockSelect = el('select', 'cd-select');
     CLOCK_PRESETS.forEach(function (p, i) {
-      var opt = el('option', null, p.label);
+      var opt = el('option', null, t(p.label));
       opt.value = String(i);
       clockSelect.appendChild(opt);
     });
     box.appendChild(clockSelect);
-    box.appendChild(el('div', 'cd-hint', 'Es zählt nur die Online-Zeit des Spielers am Zug. Ist jemand offline, pausiert seine Uhr.'));
+    box.appendChild(el('div', 'cd-hint',
+      t('Only the online time of the player to move is counted. If someone is offline, their clock pauses.')));
 
-    // E-Mail-Benachrichtigung
-    box.appendChild(el('label', 'cd-field-label', 'E-Mail für Zug-Benachrichtigung (optional)'));
+    // E-mail notification
+    box.appendChild(el('label', 'cd-field-label', t('E-mail for move notification (optional)')));
     var emailInput = el('input', 'cd-name-input');
     emailInput.type = 'email';
     emailInput.maxLength = 100;
-    emailInput.placeholder = 'name@beispiel.de';
+    emailInput.placeholder = 'name@example.com';
     emailInput.value = defaultEmail();
     box.appendChild(emailInput);
     box.appendChild(el('div', 'cd-hint',
-      'Wird nur verwendet, um dich zu benachrichtigen, wenn du am Zug bist, und mit dem Spielende automatisch gelöscht – nicht dauerhaft gespeichert. Hinweis: Wie jede Eingabe ist die Adresse technisch im Server-Log sichtbar.'));
+      t('Used only to notify you when it is your turn, and automatically deleted when the game ends – not stored permanently. Note: like any input, the address is technically visible in the server log.')));
 
-    var btn = el('button', 'cd-btn cd-btn-primary', 'Neue Partie starten');
+    var btn = el('button', 'cd-btn cd-btn-primary', t('Start new game'));
     var msg = el('div', 'cd-msg');
     var self = this;
     btn.addEventListener('click', function () {
       btn.disabled = true;
-      msg.textContent = 'Erstelle Partie ...';
+      msg.textContent = t('Creating game …');
       var nm = nameInput.value.trim();
       var em = emailInput.value.trim();
       var preset = CLOCK_PRESETS[parseInt(clockSelect.value, 10)] || CLOCK_PRESETS[0];
@@ -166,7 +179,7 @@
         self.enterGame(data.id);
       }).catch(function (e) {
         btn.disabled = false;
-        msg.textContent = 'Fehler: ' + e.message;
+        msg.textContent = tf('Error: %s', e.message);
       });
     });
     box.appendChild(btn);
@@ -180,7 +193,7 @@
     return u.toString();
   };
 
-  // ---------- Partie betreten ----------
+  // ---------- Enter game ----------
   ChessDuell.prototype.enterGame = function (id) {
     var self = this;
     this.gameId = id;
@@ -189,10 +202,10 @@
     if (ident && ident.token) { body.token = ident.token; }
     var myName = defaultName();
     if (myName) { body.name = myName; }
-    // Nur eine ausdrücklich gesetzte Adresse senden (Opt-in), nicht die reine Vorbelegung.
+    // Only send an explicitly set address (opt-in), not the mere prefill.
     var myEmail = loadEmail();
     if (myEmail) { body.email = myEmail; }
-    this.root.innerHTML = '<div class="cd-msg">Verbinde mit Partie ...</div>';
+    this.root.innerHTML = '<div class="cd-msg">' + t('Connecting to game …') + '</div>';
     api('game/' + id + '/join', 'POST', body).then(function (data) {
       self.color = data.color;
       self.token = data.token || (ident && ident.token) || null;
@@ -202,9 +215,9 @@
       self.startPolling();
     }).catch(function (e) {
       self.root.innerHTML = '';
-      var m = el('div', 'cd-msg', 'Partie konnte nicht geladen werden: ' + e.message);
+      var m = el('div', 'cd-msg', tf('Could not load game: %s', e.message));
       self.root.appendChild(m);
-      var back = el('button', 'cd-btn', 'Zurück zur Lobby');
+      var back = el('button', 'cd-btn', t('Back to lobby'));
       back.addEventListener('click', function () {
         history.replaceState(null, '', window.location.pathname);
         self.renderLobby();
@@ -213,13 +226,13 @@
     });
   };
 
-  // ---------- Zustand vom Server uebernehmen ----------
+  // ---------- Apply server state ----------
   ChessDuell.prototype.applyState = function (state) {
     if (!state) { return; }
     this.state = state;
     var moves = state.moves || [];
     if (moves.length < this.appliedMoves) {
-      // Sollte nicht vorkommen – Sicherheitsnetz: komplett neu aufbauen.
+      // Should not happen – safety net: rebuild from scratch.
       this.engine = new Engine();
       this.appliedMoves = 0;
     }
@@ -228,13 +241,13 @@
       this.engine.move({ from: m.from, to: m.to, promotion: m.promotion });
     }
     this.appliedMoves = moves.length;
-    // Uhr-Stand synchronisieren (Basis für die lokale Anzeige bis zum nächsten Poll).
+    // Sync clock (basis for local display until the next poll).
     this.clockState = state.clock || { enabled: false };
     this.clockSyncAt = Date.now();
     this.flagFetched = false;
   };
 
-  // ---------- Spielansicht ----------
+  // ---------- Game view ----------
   ChessDuell.prototype.renderGame = function () {
     var r = this.root;
     r.innerHTML = '';
@@ -252,7 +265,7 @@
 
     var side = el('div', 'cd-side');
     this.moveListEl = el('div', 'cd-moves');
-    side.appendChild(el('h3', null, 'Zugliste'));
+    side.appendChild(el('h3', null, t('Move list')));
     side.appendChild(this.moveListEl);
 
     var controls = el('div', 'cd-controls');
@@ -263,11 +276,11 @@
 
     if (this.color === 'white' || this.color === 'black') {
       var nameWrap = el('div', 'cd-name-edit');
-      nameWrap.appendChild(el('label', 'cd-name-label', 'Dein Name'));
+      nameWrap.appendChild(el('label', 'cd-name-label', t('Your name')));
       var nameField = el('input', 'cd-name-input');
       nameField.type = 'text';
       nameField.maxLength = 24;
-      nameField.placeholder = this.color === 'white' ? 'Weiß' : 'Schwarz';
+      nameField.placeholder = this.color === 'white' ? t('White') : t('Black');
       var ownName = this.color === 'white'
         ? (this.state && this.state.white_name)
         : (this.state && this.state.black_name);
@@ -277,23 +290,23 @@
       controls.appendChild(nameWrap);
 
       var emailWrap = el('div', 'cd-name-edit');
-      emailWrap.appendChild(el('label', 'cd-name-label', 'E-Mail-Benachrichtigung'));
+      emailWrap.appendChild(el('label', 'cd-name-label', t('E-mail notification')));
       var emailField = el('input', 'cd-name-input');
       emailField.type = 'email';
       emailField.maxLength = 100;
-      emailField.placeholder = 'name@beispiel.de';
+      emailField.placeholder = 'name@example.com';
       emailField.value = defaultEmail();
       emailField.addEventListener('change', function () { self.saveOwnEmail(this.value); });
       emailWrap.appendChild(emailField);
       emailWrap.appendChild(el('div', 'cd-hint',
-        'Benachrichtigung, wenn du am Zug bist. Adresse wird mit Spielende gelöscht, nicht dauerhaft gespeichert (im Server-Log sichtbar). Feld leeren = aus.'));
+        t('Notification when it is your turn. The address is deleted when the game ends, not stored permanently (visible in the server log). Empty field = off.')));
       controls.appendChild(emailWrap);
 
-      this.resignBtn = el('button', 'cd-btn cd-btn-danger', 'Aufgeben');
+      this.resignBtn = el('button', 'cd-btn cd-btn-danger', t('Give up'));
       this.resignBtn.addEventListener('click', function () { self.resign(); });
       controls.appendChild(this.resignBtn);
     }
-    var newBtn = el('button', 'cd-btn', 'Neue Partie');
+    var newBtn = el('button', 'cd-btn', t('New game'));
     newBtn.addEventListener('click', function () {
       history.replaceState(null, '', window.location.pathname);
       self.stopPolling();
@@ -326,31 +339,31 @@
   ChessDuell.prototype.updateShare = function () {
     var box = this.shareBox; box.innerHTML = '';
     if (this.state && this.state.has_black) {
-      box.appendChild(el('div', 'cd-muted', 'Beide Spieler sind verbunden.'));
+      box.appendChild(el('div', 'cd-muted', t('Both players are connected.')));
       return;
     }
     if (this.color === 'white') {
-      box.appendChild(el('div', 'cd-muted', 'Teile diesen Link mit deinem Gegner:'));
+      box.appendChild(el('div', 'cd-muted', t('Share this link with your opponent:')));
       var url = this.gameUrl(this.gameId);
       var input = el('input', 'cd-link');
       input.type = 'text'; input.readOnly = true; input.value = url;
       input.addEventListener('focus', function () { this.select(); });
       box.appendChild(input);
-      var copy = el('button', 'cd-btn', 'Link kopieren');
+      var copy = el('button', 'cd-btn', t('Copy link'));
       copy.addEventListener('click', function () {
         input.select();
         if (navigator.clipboard) { navigator.clipboard.writeText(url); }
         else { document.execCommand('copy'); }
-        copy.textContent = 'Kopiert!';
-        setTimeout(function () { copy.textContent = 'Link kopieren'; }, 1500);
+        copy.textContent = t('Copied!');
+        setTimeout(function () { copy.textContent = t('Copy link'); }, 1500);
       });
       box.appendChild(copy);
     } else if (this.color === 'spectator') {
-      box.appendChild(el('div', 'cd-muted', 'Du schaust als Zuschauer zu.'));
+      box.appendChild(el('div', 'cd-muted', t('You are watching as a spectator.')));
     }
   };
 
-  // ---------- Brett zeichnen ----------
+  // ---------- Draw board ----------
   ChessDuell.prototype.drawBoard = function () {
     var b = this.boardEl;
     b.innerHTML = '';
@@ -367,7 +380,7 @@
     var st = this.engine.gameStatus();
     if (st.check) { kingInCheck = this.engine.kingSquare(this.engine.turn); }
 
-    // Felder des letzten Zuges (von/nach) leicht hervorheben.
+    // Highlight the squares of the last move (from/to).
     var lastFrom = null, lastTo = null;
     var mv = this.state && this.state.moves;
     if (mv && mv.length) { lastFrom = mv[mv.length - 1].from; lastTo = mv[mv.length - 1].to; }
@@ -389,7 +402,7 @@
         if (this.selected === square) { cell.classList.add('cd-selected'); }
         if (legalTargets[square]) { cell.classList.add(piece ? 'cd-capture' : 'cd-target'); }
         if (kingInCheck && kingInCheck.r === r && kingInCheck.c === c) { cell.classList.add('cd-check'); }
-        // Koordinaten
+        // Coordinates
         if (ci === 0) { cell.appendChild(el('span', 'cd-coord cd-rank', String(8 - r))); }
         if (ri === rows.length - 1) { cell.appendChild(el('span', 'cd-coord cd-file', String.fromCharCode(97 + c))); }
         cell.addEventListener('click', function () { self.onCellClick(this.dataset.square); });
@@ -412,7 +425,6 @@
     var myColorCode = this.color === 'white' ? 'w' : 'b';
 
     if (this.selected) {
-      // Zielfeld?
       var target = this.legalCache.filter(function (m) { return m.to === square; });
       if (target.length) {
         var needsPromo = target.some(function (m) { return m.promotion; });
@@ -421,7 +433,6 @@
         return;
       }
     }
-    // Neue Auswahl
     if (piece && piece[0] === myColorCode) {
       this.selected = square;
       this.legalCache = this.engine.moves({ square: square });
@@ -437,22 +448,22 @@
     var p = this.promoEl;
     p.innerHTML = '';
     p.classList.remove('cd-hidden');
-    p.appendChild(el('div', 'cd-promo-title', 'Umwandeln in:'));
+    p.appendChild(el('div', 'cd-promo-title', t('Promote to:')));
     var self = this;
-    ['q', 'r', 'b', 'n'].forEach(function (t) {
+    ['q', 'r', 'b', 'n'].forEach(function (pt) {
       var btn = el('button', 'cd-promo-btn cd-' + (self.color === 'white' ? 'white' : 'black'),
-        GLYPH[t]);
-      btn.title = PROMO_LABEL[t];
+        GLYPH[pt]);
+      btn.title = t(PROMO_LABEL[pt]);
       btn.addEventListener('click', function () {
         p.classList.add('cd-hidden');
         var fp = self.pendingPromo; self.pendingPromo = null;
-        self.doMove(fp.from, fp.to, t);
+        self.doMove(fp.from, fp.to, pt);
       });
       p.appendChild(btn);
     });
   };
 
-  // ---------- Zug ausfuehren & senden ----------
+  // ---------- Make & send move ----------
   ChessDuell.prototype.doMove = function (from, to, promotion) {
     var self = this;
     var move = this.engine.move({ from: from, to: to, promotion: promotion });
@@ -468,7 +479,7 @@
       if (status.type === 'checkmate') { result = status.winner === 'w' ? '1-0' : '0-1'; }
       else { result = '1/2-1/2'; }
     }
-    // Optimistisch anzeigen
+    // Optimistic display
     if (this.state) {
       this.state.moves = (this.state.moves || []).concat([{ from: from, to: to, promotion: promotion, san: move.san }]);
       this.state.turn = this.engine.turn;
@@ -478,16 +489,16 @@
     this.updateStatus();
     this.updateMoveList();
 
-    // Der Server validiert den Zug selbst und liefert den maßgeblichen Zustand.
+    // The server validates the move itself and returns the authoritative state.
     api('game/' + this.gameId + '/move', 'POST', {
       token: this.token, from: from, to: to, promotion: promotion
     }).then(function (data) {
       self.applyState(data);
       self.refreshUI();
     }).catch(function (e) {
-      // Konflikt / serverseitig abgelehnt: maßgeblichen Zustand neu laden
+      // Conflict / rejected by server: reload authoritative state
       self.fetchState();
-      console.warn('Zug abgelehnt:', e.message);
+      console.warn('Move rejected:', e.message);
     });
   };
 
@@ -507,13 +518,13 @@
     var em = (value || '').trim();
     saveEmail(em);
     if (!this.token) { return; }
-    // Leeres Feld = Benachrichtigung deaktivieren (Adresse wird serverseitig entfernt).
+    // Empty field = disable notification (address is removed server-side).
     api('game/' + this.gameId + '/join', 'POST', { token: this.token, email: em }).then(function (data) {
       if (data && data.state) { self.state = data.state; }
     }).catch(function (e) { console.warn(e.message); });
   };
 
-  // ---------- Schachuhr ----------
+  // ---------- Chess clock ----------
   ChessDuell.prototype.startClock = function () {
     var self = this;
     this.stopClock();
@@ -535,8 +546,8 @@
     var cs = this.clockState;
     if (!cs || !cs.enabled) { c.innerHTML = ''; c.style.display = 'none'; return; }
     c.style.display = '';
-    var wName = (this.state && this.state.white_name) ? this.state.white_name : 'Weiß';
-    var bName = (this.state && this.state.black_name) ? this.state.black_name : 'Schwarz';
+    var wName = (this.state && this.state.white_name) ? this.state.white_name : t('White');
+    var bName = (this.state && this.state.black_name) ? this.state.black_name : t('Black');
     var wMs = this.liveClock('w');
     var bMs = this.liveClock('b');
 
@@ -550,7 +561,7 @@
     c.appendChild(wBox);
     c.appendChild(bBox);
 
-    // Lokaler Flag-Fall: wenn meine eigene Uhr 0 erreicht, Server final entscheiden lassen.
+    // Local flag-fall: when my own clock hits 0, let the server decide.
     var myCode = this.color === 'white' ? 'w' : this.color === 'black' ? 'b' : null;
     if (myCode && cs.running === myCode && (myCode === 'w' ? wMs : bMs) <= 0 && !this.flagFetched) {
       this.flagFetched = true;
@@ -559,25 +570,24 @@
   };
 
   ChessDuell.prototype.resign = function () {
-    if (!confirm('Partie wirklich aufgeben?')) { return; }
+    if (!confirm(t('Really give up the game?'))) { return; }
     var self = this;
-    var result = this.color === 'white' ? '0-1' : '1-0';
     api('game/' + this.gameId + '/resign', 'POST', { token: this.token }).then(function (data) {
       self.applyState(data);
       self.refreshUI();
     }).catch(function (e) { console.warn(e.message); });
   };
 
-  // ---------- Statusleiste & Zugliste ----------
+  // ---------- Status & move list ----------
   ChessDuell.prototype.updateStatus = function () {
     var s = this.statusBar; if (!s) { return; }
     var st = this.engine.gameStatus();
-    var wName = (this.state && this.state.white_name) ? this.state.white_name : 'Weiß';
+    var wName = (this.state && this.state.white_name) ? this.state.white_name : t('White');
     var bName = (this.state && this.state.black_name) ? this.state.black_name
-              : ((this.state && this.state.has_black) ? 'Schwarz' : '—');
+              : ((this.state && this.state.has_black) ? t('Black') : '—');
 
-    var youAre = this.color === 'white' ? 'Du spielst Weiß' :
-                 this.color === 'black' ? 'Du spielst Schwarz' : 'Zuschauer';
+    var youAre = this.color === 'white' ? t('You play White') :
+                 this.color === 'black' ? t('You play Black') : t('Spectator');
     var line2 = '';
     var cls = 'cd-status';
 
@@ -586,28 +596,28 @@
       var rt = this.state.result_type;
       var winner = res === '1-0' ? wName : (res === '0-1' ? bName : null);
       if (res === '1/2-1/2') {
-        line2 = 'Remis' + (rt === 'stalemate' ? ' (Patt)' : rt === 'fiftymove' ? ' (50-Züge-Regel)'
-              : rt === 'material' ? ' (unzureichendes Material)' : '');
+        line2 = t('Draw') + (rt === 'stalemate' ? t(' (stalemate)') : rt === 'fiftymove' ? t(' (fifty-move rule)')
+              : rt === 'material' ? t(' (insufficient material)') : '');
       } else if (winner) {
-        var how = rt === 'timeout' ? ' (Zeit abgelaufen)' : rt === 'resign' ? ' (Aufgabe)'
-                : rt === 'checkmate' ? ' (Schachmatt)' : '';
-        line2 = 'Sieg – ' + winner + ' gewinnt' + how;
+        var how = rt === 'timeout' ? t(' (on time)') : rt === 'resign' ? t(' (by resignation)')
+                : rt === 'checkmate' ? t(' (checkmate)') : '';
+        line2 = tf('Victory – %s wins', winner) + how;
       } else {
-        line2 = 'Partie beendet';
+        line2 = t('Game over');
       }
       cls += ' cd-status-over';
     } else if (st.over) {
-      if (st.type === 'checkmate') { line2 = 'Schachmatt – ' + (st.winner === 'w' ? wName : bName) + ' gewinnt'; }
-      else if (st.type === 'stalemate') { line2 = 'Patt – Remis'; }
-      else if (st.type === 'fiftymove') { line2 = '50-Züge-Regel – Remis'; }
-      else { line2 = 'Remis (unzureichendes Material)'; }
+      if (st.type === 'checkmate') { line2 = tf('Checkmate – %s wins', st.winner === 'w' ? wName : bName); }
+      else if (st.type === 'stalemate') { line2 = t('Stalemate – draw'); }
+      else if (st.type === 'fiftymove') { line2 = t('Fifty-move rule – draw'); }
+      else { line2 = t('Draw (insufficient material)'); }
       cls += ' cd-status-over';
     } else if (!this.state || !this.state.has_black) {
-      line2 = 'Warte auf den Gegner ...';
+      line2 = t('Waiting for opponent …');
     } else {
       var turnName = this.engine.turn === 'w' ? wName : bName;
-      line2 = 'Am Zug: ' + turnName + (this.myTurn() ? ' (du)' : '');
-      if (st.check) { line2 += ' – Schach!'; }
+      line2 = tf('On move: %s', turnName) + (this.myTurn() ? t(' (you)') : '');
+      if (st.check) { line2 += t(' – Check!'); }
     }
     s.className = cls;
     s.innerHTML = '';
@@ -657,7 +667,7 @@
   ChessDuell.prototype.fetchState = function () {
     var self = this;
     if (document.hidden) { return; }
-    // Token als Heartbeat mitgeben, damit der Server die Online-Zeit der Uhr bucht.
+    // Send the token as heartbeat so the server books the clock's online time.
     var path = 'game/' + this.gameId + (this.token ? '?t=' + encodeURIComponent(this.token) : '');
     api(path).then(function (data) {
       var before = self.appliedMoves;
@@ -668,7 +678,6 @@
           (data.status !== beforeStatus)) {
         self.refreshUI();
       } else {
-        // Verbindungs-/Uhr-Status aktualisieren
         self.updateShare();
         self.updateStatus();
         self.renderClocks();

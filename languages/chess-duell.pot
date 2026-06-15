@@ -1,0 +1,232 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: Chess Duell 1.5.1\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Domain: chess-duell\n"
+
+msgid "Play chess online against each other"
+msgstr ""
+
+msgid "Start a new game and share the link with your opponent. Whoever creates the link plays White."
+msgstr ""
+
+msgid "Your name"
+msgstr ""
+
+msgid "Your name (optional)"
+msgstr ""
+
+msgid "Chess clock"
+msgstr ""
+
+msgid "No clock"
+msgstr ""
+
+msgid "5 minutes"
+msgstr ""
+
+msgid "10 minutes"
+msgstr ""
+
+msgid "15 min + 10 sec/move"
+msgstr ""
+
+msgid "30 minutes"
+msgstr ""
+
+msgid "Only the online time of the player to move is counted. If someone is offline, their clock pauses."
+msgstr ""
+
+msgid "E-mail for move notification (optional)"
+msgstr ""
+
+msgid "Used only to notify you when it is your turn, and automatically deleted when the game ends – not stored permanently. Note: like any input, the address is technically visible in the server log."
+msgstr ""
+
+msgid "Start new game"
+msgstr ""
+
+msgid "Creating game …"
+msgstr ""
+
+msgid "Error: %s"
+msgstr ""
+
+msgid "Connecting to game …"
+msgstr ""
+
+msgid "Could not load game: %s"
+msgstr ""
+
+msgid "Back to lobby"
+msgstr ""
+
+msgid "Move list"
+msgstr ""
+
+msgid "White"
+msgstr ""
+
+msgid "Black"
+msgstr ""
+
+msgid "E-mail notification"
+msgstr ""
+
+msgid "Notification when it is your turn. The address is deleted when the game ends, not stored permanently (visible in the server log). Empty field = off."
+msgstr ""
+
+msgid "Give up"
+msgstr ""
+
+msgid "New game"
+msgstr ""
+
+msgid "Promote to:"
+msgstr ""
+
+msgid "Queen"
+msgstr ""
+
+msgid "Rook"
+msgstr ""
+
+msgid "Bishop"
+msgstr ""
+
+msgid "Knight"
+msgstr ""
+
+msgid "Both players are connected."
+msgstr ""
+
+msgid "Share this link with your opponent:"
+msgstr ""
+
+msgid "Copy link"
+msgstr ""
+
+msgid "Copied!"
+msgstr ""
+
+msgid "You are watching as a spectator."
+msgstr ""
+
+msgid "You play White"
+msgstr ""
+
+msgid "You play Black"
+msgstr ""
+
+msgid "Spectator"
+msgstr ""
+
+msgid "Draw"
+msgstr ""
+
+msgid " (stalemate)"
+msgstr ""
+
+msgid " (fifty-move rule)"
+msgstr ""
+
+msgid " (insufficient material)"
+msgstr ""
+
+msgid "Victory – %s wins"
+msgstr ""
+
+msgid " (on time)"
+msgstr ""
+
+msgid " (by resignation)"
+msgstr ""
+
+msgid " (checkmate)"
+msgstr ""
+
+msgid "Game over"
+msgstr ""
+
+msgid "Checkmate – %s wins"
+msgstr ""
+
+msgid "Stalemate – draw"
+msgstr ""
+
+msgid "Fifty-move rule – draw"
+msgstr ""
+
+msgid "Draw (insufficient material)"
+msgstr ""
+
+msgid "Waiting for opponent …"
+msgstr ""
+
+msgid "On move: %s"
+msgstr ""
+
+msgid " (you)"
+msgstr ""
+
+msgid " – Check!"
+msgstr ""
+
+msgid "Really give up the game?"
+msgstr ""
+
+msgid "Game not found or expired."
+msgstr ""
+
+msgid "Random number generator not available."
+msgstr ""
+
+msgid "No valid player token."
+msgstr ""
+
+msgid "The game has already ended."
+msgstr ""
+
+msgid "No opponent has connected yet."
+msgstr ""
+
+msgid "It is not your turn."
+msgstr ""
+
+msgid "Invalid squares."
+msgstr ""
+
+msgid "Inconsistent position."
+msgstr ""
+
+msgid "Invalid move."
+msgstr ""
+
+msgid "There are already %d games in progress at the same time. Please try again later."
+msgstr ""
+
+msgid "Chess: it is your turn"
+msgstr ""
+
+msgid "Hello,\n\n%1$s has moved – it is your turn now.\n\nTo the game:\n%2$s\n\nNote: your address is used only for notifications of this game and is automatically deleted when the game ends. It is not stored permanently."
+msgstr ""
+
+msgid "Chess Duell – Settings"
+msgstr ""
+
+msgid "Maximum concurrent games"
+msgstr ""
+
+msgid "How many games may run at the same time (1–200). Finished games do not count. Logged-in WordPress users may bypass this limit."
+msgstr ""
+
+msgid "Lifetime until auto-end (days)"
+msgstr ""
+
+msgid "After this many days without activity a game is removed automatically (1–365). Otherwise a game ends only by checkmate, resignation or draw."
+msgstr ""
+
+msgid "Shortcode:"
+msgstr ""
+
