@@ -1,0 +1,2 @@
+# Einheitliche Zeilenenden: Textdateien immer mit LF im Repository
+* text=auto eol=lf
