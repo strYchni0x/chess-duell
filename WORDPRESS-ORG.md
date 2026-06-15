@@ -61,14 +61,19 @@ svn ci -m "Release 1.5.1"
 
 ## 3. Grafiken (gehören nach /assets im SVN, NICHT ins Plugin-ZIP)
 
-Im SVN-Ordner `assets/` ablegen:
+Die fertigen Platzhalter liegen versioniert im Ordner **`.wordpress-org/`**
+dieses Branches (dieser Ordner wird vom Plugin-ZIP-Build ausgeschlossen).
+Von dort in den SVN-Ordner `assets/` kopieren:
 
 - Icon: `icon-128x128.png` (128×128) und `icon-256x256.png` (256×256)
 - Banner: `banner-772x250.png` (772×250) und `banner-1544x500.png` (1544×500)
 - Screenshots: `screenshot-1.png`, `screenshot-2.png`, `screenshot-3.png`
-  (Reihenfolge/Beschreibung entspricht dem Abschnitt "== Screenshots ==" in readme.txt)
+  (echte Bildschirmfotos; Reihenfolge/Beschreibung entspricht dem Abschnitt
+  "== Screenshots ==" in readme.txt)
 
 ```
+cp .wordpress-org/*.png chess-duell-svn/assets/
+cd chess-duell-svn
 svn add assets/*
 svn ci -m "Assets"
 ```
