@@ -658,7 +658,9 @@
     var self = this;
     if (document.hidden) { return; }
     // Token als Heartbeat mitgeben, damit der Server die Online-Zeit der Uhr bucht.
-    var path = 'game/' + this.gameId + (this.token ? '?t=' + encodeURIComponent(this.token) : '');
+    // Trenner abhängig von der REST-Basis-URL (Plain-Permalinks enthalten schon "?").
+    var sep = (CFG.restUrl && CFG.restUrl.indexOf('?') !== -1) ? '&' : '?';
+    var path = 'game/' + this.gameId + (this.token ? sep + 't=' + encodeURIComponent(this.token) : '');
     api(path).then(function (data) {
       var before = self.appliedMoves;
       var beforeBlack = self.state && self.state.has_black;
