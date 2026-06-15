@@ -34,21 +34,6 @@ define('CHESS_DUELL_START_FEN', 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w K
 require_once CHESS_DUELL_PATH . 'includes/class-chess-engine.php';
 
 /* ------------------------------------------------------------------ *
- *  GitHub-Updater
- *  Meldet Updates aus dem GitHub-Repository im WordPress-Dashboard.
- *  → Bei Umstieg auf wordpress.org diesen Block UND die Datei
- *    includes/class-github-updater.php entfernen (siehe Hinweis dort).
- * ------------------------------------------------------------------ */
-if (is_admin() || (defined('DOING_CRON') && DOING_CRON)) {
-    require_once CHESS_DUELL_PATH . 'includes/class-github-updater.php';
-    new Chess_Duell_GitHub_Updater(
-        __FILE__,
-        'strYchni0x/chess-duell',
-        defined('CHESS_DUELL_GITHUB_TOKEN') ? CHESS_DUELL_GITHUB_TOKEN : ''
-    );
-}
-
-/* ------------------------------------------------------------------ *
  *  Einstellungen (im Backend konfigurierbar)
  * ------------------------------------------------------------------ */
 
