@@ -3,7 +3,7 @@
  * Plugin Name:       Chess Duell
  * Plugin URI:        https://github.com/strYchni0x/chess-duell
  * Description:        Zwei Menschen spielen online Schach gegeneinander – Partie einfach per Link teilen. Anzahl gleichzeitiger Partien und Laufzeit im Backend einstellbar. Serverseitige Regelprüfung (kein Cheaten möglich), keine KI. Einbinden mit dem Shortcode [chess_duell].
- * Version:           1.5.6
+ * Version:           1.5.7
  * Author:            Florian Willnat
  * License:           GPL-2.0-or-later
  * License URI:       https://www.gnu.org/licenses/gpl-2.0.html
@@ -14,7 +14,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('CHESS_DUELL_VERSION', '1.5.6');
+define('CHESS_DUELL_VERSION', '1.5.7');
 define('CHESS_DUELL_URL', plugin_dir_url(__FILE__));
 define('CHESS_DUELL_PATH', plugin_dir_path(__FILE__));
 define('CHESS_DUELL_OPTION', 'chess_duell_games');
@@ -327,12 +327,24 @@ function chess_duell_notify_turn(&$game, $color) {
         : ($game['white_name'] !== '' ? $game['white_name'] : 'Weiß');
     $link    = chess_duell_game_link($game);
 
+    // Zuletzt gezogenen Zug (SAN) für die Mail aufbereiten (leer, falls noch kein Zug).
+    $lastMove = '';
+    if (!empty($game['moves'])) {
+        $m   = end($game['moves']);
+        $san = (isset($m['san']) && $m['san'] !== '') ? $m['san'] : ($m['from'] . $m['to']);
+        $ply = count($game['moves']);
+        $num = (int) ceil($ply / 2);
+        $notation = (($ply % 2) === 1) ? ($num . '. ' . $san) : ($num . '… ' . $san);
+        $lastMove = 'Zuletzt gezogen: ' . $notation . "\n\n";
+    }
+
     $subject = 'Schach: Du bist am Zug';
     $body    = sprintf(
-        "Hallo,\n\n%s hat gezogen – du bist jetzt am Zug.\n\nZur Partie:\n%s\n\n" .
+        "Hallo,\n\n%s hat gezogen – du bist jetzt am Zug.\n\n%sZur Partie:\n%s\n\n" .
         "Hinweis: Deine Adresse wird nur für Benachrichtigungen dieser Partie verwendet " .
         "und mit dem Spielende automatisch gelöscht. Sie wird nicht dauerhaft gespeichert.",
         $oppName,
+        $lastMove,
         $link
     );
     wp_mail($email, $subject, $body);
