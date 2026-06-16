@@ -3,7 +3,7 @@
  * Plugin Name:       Chess Duell
  * Plugin URI:        https://github.com/strYchni0x/chess-duell
  * Description:        Zwei Menschen spielen online Schach gegeneinander – Partie einfach per Link teilen. Anzahl gleichzeitiger Partien und Laufzeit im Backend einstellbar. Serverseitige Regelprüfung (kein Cheaten möglich), keine KI. Einbinden mit dem Shortcode [chess_duell].
- * Version:           1.5.7
+ * Version:           1.6.0
  * Author:            Florian Willnat
  * License:           GPL-2.0-or-later
  * License URI:       https://www.gnu.org/licenses/gpl-2.0.html
@@ -14,7 +14,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('CHESS_DUELL_VERSION', '1.5.7');
+define('CHESS_DUELL_VERSION', '1.6.0');
 define('CHESS_DUELL_URL', plugin_dir_url(__FILE__));
 define('CHESS_DUELL_PATH', plugin_dir_path(__FILE__));
 define('CHESS_DUELL_OPTION', 'chess_duell_games');
@@ -54,8 +54,9 @@ if (is_admin() || (defined('DOING_CRON') && DOING_CRON)) {
 
 function chess_duell_get_settings() {
     $defaults = array(
-        'max_games' => CHESS_DUELL_DEFAULT_MAX_GAMES,
-        'ttl_days'  => CHESS_DUELL_DEFAULT_TTL_DAYS,
+        'max_games'    => CHESS_DUELL_DEFAULT_MAX_GAMES,
+        'ttl_days'     => CHESS_DUELL_DEFAULT_TTL_DAYS,
+        'allow_bypass' => true, // angemeldete Nutzer dürfen das Limit übergehen
     );
     $s = get_option(CHESS_DUELL_SETTINGS, array());
     if (!is_array($s)) {
@@ -74,6 +75,12 @@ function chess_duell_max_games() {
 function chess_duell_ttl() {
     $s = chess_duell_get_settings();
     return max(1, intval($s['ttl_days'])) * DAY_IN_SECONDS;
+}
+
+/** Dürfen angemeldete Nutzer das Limit gleichzeitiger Partien übergehen? */
+function chess_duell_allow_bypass() {
+    $s = chess_duell_get_settings();
+    return !empty($s['allow_bypass']);
 }
 
 /* ------------------------------------------------------------------ *
@@ -391,8 +398,8 @@ add_action('rest_api_init', function () {
 function chess_duell_rest_create($req) {
     $games = chess_duell_prune(chess_duell_load_games());
 
-    // Angemeldete WordPress-Nutzer (jede Rolle) dürfen das Limit übergehen.
-    if (!is_user_logged_in()) {
+    // Angemeldete WordPress-Nutzer dürfen das Limit übergehen – sofern im Backend aktiviert.
+    if (!(is_user_logged_in() && chess_duell_allow_bypass())) {
         $max = chess_duell_max_games();
         $active = 0;
         foreach ($games as $g) {
@@ -741,8 +748,9 @@ add_action('admin_init', function () {
         'type'              => 'array',
         'sanitize_callback' => 'chess_duell_sanitize_settings',
         'default'           => array(
-            'max_games' => CHESS_DUELL_DEFAULT_MAX_GAMES,
-            'ttl_days'  => CHESS_DUELL_DEFAULT_TTL_DAYS,
+            'max_games'    => CHESS_DUELL_DEFAULT_MAX_GAMES,
+            'ttl_days'     => CHESS_DUELL_DEFAULT_TTL_DAYS,
+            'allow_bypass' => true,
         ),
     ));
 });
@@ -755,14 +763,51 @@ function chess_duell_sanitize_settings($input) {
     if ($out['max_games'] > 200) { $out['max_games'] = 200; }
     if ($out['ttl_days'] < 1)    { $out['ttl_days'] = 1; }
     if ($out['ttl_days'] > 365)  { $out['ttl_days'] = 365; }
+    // Checkbox: nicht gesetzt => deaktiviert.
+    $out['allow_bypass'] = !empty($input['allow_bypass']);
     return $out;
+}
+
+/** Verwaltungs-Aktionen (Partie löschen / beendete entfernen) abarbeiten. */
+function chess_duell_handle_admin_actions() {
+    if (empty($_POST['chess_duell_action']) || !current_user_can('manage_options')) {
+        return;
+    }
+    check_admin_referer('chess_duell_manage');
+    $action = sanitize_text_field(wp_unslash($_POST['chess_duell_action']));
+    $games  = chess_duell_load_games();
+
+    if ($action === 'delete' && !empty($_POST['game'])) {
+        $id = preg_replace('/[^a-f0-9]/', '', sanitize_text_field(wp_unslash($_POST['game'])));
+        if ($id !== '' && isset($games[$id])) {
+            unset($games[$id]);
+            chess_duell_save_games($games);
+            add_settings_error('chess_duell', 'cd_deleted', 'Partie gelöscht.', 'updated');
+        }
+    } elseif ($action === 'delete_finished') {
+        $removed = 0;
+        foreach ($games as $gid => $g) {
+            if ($g['status'] === 'finished') { unset($games[$gid]); $removed++; }
+        }
+        chess_duell_save_games($games);
+        add_settings_error('chess_duell', 'cd_deleted_fin', sprintf('%d beendete Partie(n) entfernt.', $removed), 'updated');
+    }
 }
 
 function chess_duell_settings_page() {
     if (!current_user_can('manage_options')) {
         return;
     }
-    $s = chess_duell_get_settings();
+    chess_duell_handle_admin_actions();
+    $s     = chess_duell_get_settings();
+    $games = chess_duell_prune(chess_duell_load_games());
+    chess_duell_save_games($games); // abgelaufene Partien gleich aufräumen
+
+    $active = 0;
+    foreach ($games as $g) {
+        if ($g['status'] !== 'finished') { $active++; }
+    }
+    settings_errors('chess_duell');
     ?>
     <div class="wrap">
         <h1>Chess Duell – Einstellungen</h1>
@@ -775,7 +820,18 @@ function chess_duell_settings_page() {
                         <input name="<?php echo esc_attr(CHESS_DUELL_SETTINGS); ?>[max_games]" id="cd-max"
                                type="number" min="1" max="200" step="1"
                                value="<?php echo esc_attr($s['max_games']); ?>" class="small-text">
-                        <p class="description">Wie viele laufende Partien gleichzeitig erlaubt sind (1–200). Beendete Partien zählen nicht mit. Angemeldete WordPress-Nutzer dürfen dieses Limit übergehen.</p>
+                        <p class="description">Wie viele laufende Partien gleichzeitig erlaubt sind (1–200). Beendete Partien zählen nicht mit.</p>
+                    </td>
+                </tr>
+                <tr>
+                    <th scope="row">Angemeldete Nutzer</th>
+                    <td>
+                        <label>
+                            <input type="checkbox" name="<?php echo esc_attr(CHESS_DUELL_SETTINGS); ?>[allow_bypass]"
+                                   value="1" <?php checked(!empty($s['allow_bypass'])); ?>>
+                            Angemeldete WordPress-Nutzer dürfen das Limit gleichzeitiger Partien übergehen
+                        </label>
+                        <p class="description">Wenn deaktiviert, gilt das Limit oben für alle – auch für angemeldete Nutzer.</p>
                     </td>
                 </tr>
                 <tr>
@@ -790,8 +846,82 @@ function chess_duell_settings_page() {
             </table>
             <?php submit_button(); ?>
         </form>
-        <p><strong>Shortcode:</strong> <code>[chess_duell]</code></p>
+
+        <h2>Laufende Partien</h2>
+        <p>
+            <strong><?php echo intval($active); ?></strong> laufende Partie(n),
+            <strong><?php echo count($games); ?></strong> gespeichert insgesamt.
+        </p>
+        <?php chess_duell_render_games_table($games); ?>
+
+        <p style="margin-top:1em;"><strong>Shortcode:</strong> <code>[chess_duell]</code></p>
     </div>
+    <?php
+}
+
+/** Tabelle aller gespeicherten Partien mit Lösch-Aktion. */
+function chess_duell_render_games_table($games) {
+    if (empty($games)) {
+        echo '<p>Aktuell sind keine Partien gespeichert.</p>';
+        return;
+    }
+    $status_labels = array('waiting' => 'Wartet auf Gegner', 'active' => 'Läuft', 'finished' => 'Beendet');
+    // Neueste zuerst.
+    uasort($games, function ($a, $b) { return intval($b['updated']) - intval($a['updated']); });
+    ?>
+    <table class="wp-list-table widefat fixed striped">
+        <thead>
+            <tr>
+                <th>Status</th>
+                <th>Weiß</th>
+                <th>Schwarz</th>
+                <th>Züge</th>
+                <th>Am Zug</th>
+                <th>Uhr</th>
+                <th>Letzte Aktivität</th>
+                <th>Aktion</th>
+            </tr>
+        </thead>
+        <tbody>
+        <?php foreach ($games as $id => $g) :
+            $status = isset($status_labels[$g['status']]) ? $status_labels[$g['status']] : $g['status'];
+            if ($g['status'] === 'finished' && !empty($g['result'])) {
+                $status .= ' (' . $g['result'] . ')';
+            }
+            $white = $g['white_name'] !== '' ? $g['white_name'] : 'Weiß';
+            $black = !empty($g['black_token']) ? ($g['black_name'] !== '' ? $g['black_name'] : 'Schwarz') : '—';
+            $turn  = $g['status'] === 'finished' ? '—' : ($g['turn'] === 'w' ? 'Weiß' : 'Schwarz');
+            $clock = !empty($g['clock_enabled']) ? (intval($g['clock_base'] / 60000) . ' Min'
+                     . (intval($g['clock_inc']) > 0 ? ' +' . intval($g['clock_inc'] / 1000) . ' Sek' : '')) : '—';
+            $ago   = human_time_diff(intval($g['updated']), time()) . ' her';
+        ?>
+            <tr>
+                <td><?php echo esc_html($status); ?></td>
+                <td><?php echo esc_html($white); ?></td>
+                <td><?php echo esc_html($black); ?></td>
+                <td><?php echo intval(count($g['moves'])); ?></td>
+                <td><?php echo esc_html($turn); ?></td>
+                <td><?php echo esc_html($clock); ?></td>
+                <td><?php echo esc_html($ago); ?></td>
+                <td>
+                    <form method="post" style="margin:0;"
+                          onsubmit="return confirm('Diese Partie wirklich löschen?');">
+                        <?php wp_nonce_field('chess_duell_manage'); ?>
+                        <input type="hidden" name="chess_duell_action" value="delete">
+                        <input type="hidden" name="game" value="<?php echo esc_attr($id); ?>">
+                        <button type="submit" class="button button-small button-link-delete">Löschen</button>
+                    </form>
+                </td>
+            </tr>
+        <?php endforeach; ?>
+        </tbody>
+    </table>
+    <form method="post" style="margin-top:0.8em;"
+          onsubmit="return confirm('Alle beendeten Partien entfernen?');">
+        <?php wp_nonce_field('chess_duell_manage'); ?>
+        <input type="hidden" name="chess_duell_action" value="delete_finished">
+        <button type="submit" class="button">Alle beendeten Partien entfernen</button>
+    </form>
     <?php
 }
 

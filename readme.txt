@@ -4,7 +4,7 @@ Tags: chess, schach, game, multiplayer, spiel
 Requires at least: 5.6
 Tested up to: 7.0
 Requires PHP: 7.2
-Stable tag: 1.5.7
+Stable tag: 1.6.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -62,6 +62,10 @@ illegalen Zug durchsetzen. Spieler-Identitäten werden über ein geheimes Token
 im Link/Local-Storage des Browsers verwaltet.
 
 == Changelog ==
+
+= 1.6.0 =
+* Backend: Übersicht aller laufenden/gespeicherten Partien mit Möglichkeit, einzelne Partien zu löschen (und alle beendeten auf einmal).
+* Backend: Der Limit-Bypass für angemeldete Nutzer ist jetzt optional ein-/ausschaltbar.
 
 = 1.5.7 =
 * Die "Du bist am Zug"-E-Mail enthält jetzt den zuletzt gezogenen Zug.
