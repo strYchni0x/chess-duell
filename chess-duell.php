@@ -3,7 +3,7 @@
  * Plugin Name:       Chess Duell
  * Plugin URI:        https://github.com/strYchni0x/chess-duell
  * Description:        Two people play chess online against each other – just share a link. Number of concurrent games and lifetime configurable in the backend. Server-side rule validation (no cheating), no AI. Embed with the shortcode [chess_duell].
- * Version:           1.5.6
+ * Version:           1.5.7
  * Author:            Florian Willnat
  * License:           GPL-2.0-or-later
  * License URI:       https://www.gnu.org/licenses/gpl-2.0.html
@@ -15,7 +15,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('CHESS_DUELL_VERSION', '1.5.6');
+define('CHESS_DUELL_VERSION', '1.5.7');
 define('CHESS_DUELL_URL', plugin_dir_url(__FILE__));
 define('CHESS_DUELL_PATH', plugin_dir_path(__FILE__));
 define('CHESS_DUELL_OPTION', 'chess_duell_games');
@@ -389,12 +389,25 @@ function chess_duell_notify_turn(&$game, $color) {
         : ($game['white_name'] !== '' ? $game['white_name'] : __('White', 'chess-duell'));
     $link    = chess_duell_game_link($game);
 
+    // Last move (SAN) for the e-mail (empty if no move has been made yet).
+    $lastMove = '';
+    if (!empty($game['moves'])) {
+        $m   = end($game['moves']);
+        $san = (isset($m['san']) && $m['san'] !== '') ? $m['san'] : ($m['from'] . $m['to']);
+        $ply = count($game['moves']);
+        $num = (int) ceil($ply / 2);
+        $notation = (($ply % 2) === 1) ? ($num . '. ' . $san) : ($num . '… ' . $san);
+        /* translators: %s: chess move in algebraic notation */
+        $lastMove = sprintf(__('Last move: %s', 'chess-duell'), $notation) . "\n\n";
+    }
+
     $subject = __('Chess: it is your turn', 'chess-duell');
     $body    = sprintf(
-        /* translators: 1: opponent name, 2: link to the game */
-        __("Hello,\n\n%1\$s has moved – it is your turn now.\n\nTo the game:\n%2\$s\n\nNote: your address is used only for notifications of this game and is automatically deleted when the game ends. It is not stored permanently.", 'chess-duell'),
+        /* translators: 1: opponent name, 2: link to the game, 3: last move line (may be empty) */
+        __("Hello,\n\n%1\$s has moved – it is your turn now.\n\n%3\$sTo the game:\n%2\$s\n\nNote: your address is used only for notifications of this game and is automatically deleted when the game ends. It is not stored permanently.", 'chess-duell'),
         $oppName,
-        $link
+        $link,
+        $lastMove
     );
     wp_mail($email, $subject, $body);
 }

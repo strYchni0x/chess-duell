@@ -1,6 +1,6 @@
 msgid ""
 msgstr ""
-"Project-Id-Version: Chess Duell 1.5.1\n"
+"Project-Id-Version: Chess Duell 1.5.7\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "X-Domain: chess-duell\n"
@@ -176,6 +176,9 @@ msgstr ""
 msgid "Really give up the game?"
 msgstr ""
 
+msgid "Last move: %s"
+msgstr ""
+
 msgid "Game not found or expired."
 msgstr ""
 
@@ -209,7 +212,7 @@ msgstr ""
 msgid "Chess: it is your turn"
 msgstr ""
 
-msgid "Hello,\n\n%1$s has moved – it is your turn now.\n\nTo the game:\n%2$s\n\nNote: your address is used only for notifications of this game and is automatically deleted when the game ends. It is not stored permanently."
+msgid "Hello,\n\n%1$s has moved – it is your turn now.\n\n%3$sTo the game:\n%2$s\n\nNote: your address is used only for notifications of this game and is automatically deleted when the game ends. It is not stored permanently."
 msgstr ""
 
 msgid "Chess Duell – Settings"

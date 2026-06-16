@@ -4,7 +4,7 @@ Tags: chess, game, board game, two player
 Requires at least: 5.6
 Tested up to: 7.0
 Requires PHP: 7.2
-Stable tag: 1.5.6
+Stable tag: 1.5.7
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -78,6 +78,9 @@ or expires after the inactivity period configured in the backend (default 14 day
 
 == Changelog ==
 
+= 1.5.7 =
+* The "it's your turn" e-mail now includes the last move that was played.
+
 = 1.5.6 =
 * Plugin Check polish: removed manual load_plugin_textdomain() (auto-loaded via headers) and hardened the $_GET read in the shortcode (wp_unslash + sanitize).
 
@@ -118,5 +121,5 @@ or expires after the inactivity period configured in the backend (default 14 day
 
 == Upgrade Notice ==
 
-= 1.5.6 =
-Code-quality polish for the WordPress Plugin Check (i18n loading and input handling).
+= 1.5.7 =
+The move-notification e-mail now shows the last move that was played.
