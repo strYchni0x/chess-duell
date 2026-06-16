@@ -19,6 +19,7 @@
   }
 
   var GLYPH = { k: '♚', q: '♛', r: '♜', b: '♝', n: '♞', p: '♟' };
+  var PIECE_NAME = { k: 'König', q: 'Dame', r: 'Turm', b: 'Läufer', n: 'Springer', p: 'Bauer' };
   var PROMO_LABEL = { q: 'Dame', r: 'Turm', b: 'Läufer', n: 'Springer' };
 
   function el(tag, cls, txt) {
@@ -49,6 +50,13 @@
   }
   function loadName() {
     try { return localStorage.getItem('chessduell_name') || ''; } catch (e) { return ''; }
+  }
+  // Option "Figuren-Namen beim Überfahren anzeigen" (pro Browser merken).
+  function loadPieceNames() {
+    try { return localStorage.getItem('chessduell_piecenames') === '1'; } catch (e) { return false; }
+  }
+  function savePieceNames(on) {
+    try { localStorage.setItem('chessduell_piecenames', on ? '1' : '0'); } catch (e) {}
   }
   function saveName(n) {
     try { localStorage.setItem('chessduell_name', n); } catch (e) {}
@@ -130,6 +138,7 @@
     this.clockSyncAt = 0;
     this.clockTimer = null;
     this.flagFetched = false;
+    this.showPieceNames = loadPieceNames();
     this.init();
   }
 
@@ -355,15 +364,63 @@
     wrap.appendChild(this.boardEl);
 
     var side = el('div', 'cd-side');
+    var self = this;
+
+    // Oben: Zugliste und – für Spieler – Chat direkt daneben (mehr im Fokus).
+    var topRow = el('div', 'cd-side-top');
+
+    var movesCol = el('div', 'cd-moves-col');
+    movesCol.appendChild(el('h3', null, 'Zugliste'));
     this.moveListEl = el('div', 'cd-moves');
-    side.appendChild(el('h3', null, 'Zugliste'));
-    side.appendChild(this.moveListEl);
+    movesCol.appendChild(this.moveListEl);
+    topRow.appendChild(movesCol);
+
+    // Chat – nur für die beiden Spieler – rechts neben der Zugliste
+    this.chatLogEl = null;
+    if (this.color === 'white' || this.color === 'black') {
+      var chatWrap = el('div', 'cd-chat');
+      chatWrap.appendChild(el('h3', null, 'Chat'));
+      this.chatLogEl = el('div', 'cd-chat-log');
+      chatWrap.appendChild(this.chatLogEl);
+      var chatRow = el('div', 'cd-chat-input');
+      var chatInput = el('input', 'cd-chat-text');
+      chatInput.type = 'text';
+      chatInput.maxLength = 500;
+      chatInput.placeholder = 'Nachricht …';
+      var chatSend = el('button', 'cd-btn', 'Senden');
+      var doSend = function () {
+        var v = chatInput.value.trim();
+        if (v) { self.sendChat(v); chatInput.value = ''; }
+      };
+      chatSend.addEventListener('click', doSend);
+      chatInput.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') { e.preventDefault(); doSend(); }
+      });
+      chatRow.appendChild(chatInput);
+      chatRow.appendChild(chatSend);
+      chatWrap.appendChild(chatRow);
+      topRow.appendChild(chatWrap);
+    }
+    side.appendChild(topRow);
 
     var controls = el('div', 'cd-controls');
-    var self = this;
 
     this.shareBox = el('div', 'cd-share');
     controls.appendChild(this.shareBox);
+
+    // Option: Figuren-Namen beim Überfahren mit der Maus anzeigen (für alle).
+    var optWrap = el('label', 'cd-check-opt');
+    var optCb = el('input');
+    optCb.type = 'checkbox';
+    optCb.checked = this.showPieceNames;
+    optCb.addEventListener('change', function () {
+      self.showPieceNames = optCb.checked;
+      savePieceNames(optCb.checked);
+      self.drawBoard();
+    });
+    optWrap.appendChild(optCb);
+    optWrap.appendChild(el('span', null, 'Figuren-Namen anzeigen (beim Überfahren mit der Maus)'));
+    controls.appendChild(optWrap);
 
     if (this.color === 'white' || this.color === 'black') {
       var nameWrap = el('div', 'cd-name-edit');
@@ -406,33 +463,6 @@
     });
     controls.appendChild(newBtn);
     side.appendChild(controls);
-
-    // Chat – nur für die beiden Spieler
-    this.chatLogEl = null;
-    if (this.color === 'white' || this.color === 'black') {
-      var chatWrap = el('div', 'cd-chat');
-      chatWrap.appendChild(el('h3', null, 'Chat'));
-      this.chatLogEl = el('div', 'cd-chat-log');
-      chatWrap.appendChild(this.chatLogEl);
-      var chatRow = el('div', 'cd-chat-input');
-      var chatInput = el('input', 'cd-chat-text');
-      chatInput.type = 'text';
-      chatInput.maxLength = 500;
-      chatInput.placeholder = 'Nachricht …';
-      var chatSend = el('button', 'cd-btn', 'Senden');
-      var doSend = function () {
-        var v = chatInput.value.trim();
-        if (v) { self.sendChat(v); chatInput.value = ''; }
-      };
-      chatSend.addEventListener('click', doSend);
-      chatInput.addEventListener('keydown', function (e) {
-        if (e.key === 'Enter') { e.preventDefault(); doSend(); }
-      });
-      chatRow.appendChild(chatInput);
-      chatRow.appendChild(chatSend);
-      chatWrap.appendChild(chatRow);
-      side.appendChild(chatWrap);
-    }
 
     // "Meine Partien"-Umschalter in der Seitenleiste
     this.myGamesEl = el('div', 'cd-mygames');
@@ -522,6 +552,9 @@
         if (piece) {
           var pe = el('span', 'cd-piece cd-' + (piece[0] === 'w' ? 'white' : 'black'), GLYPH[piece[1]]);
           cell.appendChild(pe);
+          if (this.showPieceNames) {
+            cell.title = PIECE_NAME[piece[1]] + ' (' + (piece[0] === 'w' ? 'Weiß' : 'Schwarz') + ')';
+          }
         }
         if (square === lastFrom || square === lastTo) { cell.classList.add('cd-last'); }
         if (this.selected === square) { cell.classList.add('cd-selected'); }

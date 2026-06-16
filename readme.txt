@@ -4,7 +4,7 @@ Tags: chess, schach, game, multiplayer, spiel
 Requires at least: 5.6
 Tested up to: 7.0
 Requires PHP: 7.2
-Stable tag: 1.8.0
+Stable tag: 1.9.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -62,6 +62,10 @@ illegalen Zug durchsetzen. Spieler-Identitäten werden über ein geheimes Token
 im Link/Local-Storage des Browsers verwaltet.
 
 == Changelog ==
+
+= 1.9.0 =
+* Chat sitzt jetzt direkt rechts neben der Zugliste (statt darunter) – besser im Blick. Auf schmalen Bildschirmen weiterhin untereinander.
+* Neue Option auf der Spielseite: "Figuren-Namen anzeigen" – beim Überfahren einer Figur mit der Maus wird ihr Name eingeblendet (z. B. "Dame (Weiß)", "König (Schwarz)"). Die Einstellung wird pro Browser gemerkt.
 
 = 1.8.0 =
 * Neuer Chat zwischen den beiden Spielern (privat – nur die beiden Spieler können lesen und schreiben).
