@@ -259,6 +259,31 @@
     this.enterGame(id);
   };
 
+  // ---------- Chat ----------
+  ChessDuell.prototype.renderChat = function () {
+    var log = this.chatLogEl;
+    if (!log) { return; }
+    var msgs = (this.state && this.state.messages) || [];
+    var myCode = this.color === 'white' ? 'w' : 'b';
+    log.innerHTML = '';
+    msgs.forEach(function (m) {
+      var row = el('div', 'cd-chat-msg' + (m.color === myCode ? ' cd-mine' : ''));
+      row.appendChild(el('span', 'cd-chat-name', (m.name || (m.color === 'w' ? 'Weiß' : 'Schwarz')) + ': '));
+      row.appendChild(el('span', 'cd-chat-body', m.text)); // textContent -> kein HTML-Injection
+      log.appendChild(row);
+    });
+    log.scrollTop = log.scrollHeight;
+  };
+
+  ChessDuell.prototype.sendChat = function (text) {
+    var self = this;
+    if (!this.token) { return; }
+    api('game/' + this.gameId + '/chat', 'POST', { token: this.token, text: text }).then(function (data) {
+      self.applyState(data);
+      self.renderChat();
+    }).catch(function (e) { console.warn(e.message); });
+  };
+
   // ---------- Partie betreten ----------
   ChessDuell.prototype.enterGame = function (id) {
     var self = this;
@@ -382,6 +407,33 @@
     controls.appendChild(newBtn);
     side.appendChild(controls);
 
+    // Chat – nur für die beiden Spieler
+    this.chatLogEl = null;
+    if (this.color === 'white' || this.color === 'black') {
+      var chatWrap = el('div', 'cd-chat');
+      chatWrap.appendChild(el('h3', null, 'Chat'));
+      this.chatLogEl = el('div', 'cd-chat-log');
+      chatWrap.appendChild(this.chatLogEl);
+      var chatRow = el('div', 'cd-chat-input');
+      var chatInput = el('input', 'cd-chat-text');
+      chatInput.type = 'text';
+      chatInput.maxLength = 500;
+      chatInput.placeholder = 'Nachricht …';
+      var chatSend = el('button', 'cd-btn', 'Senden');
+      var doSend = function () {
+        var v = chatInput.value.trim();
+        if (v) { self.sendChat(v); chatInput.value = ''; }
+      };
+      chatSend.addEventListener('click', doSend);
+      chatInput.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') { e.preventDefault(); doSend(); }
+      });
+      chatRow.appendChild(chatInput);
+      chatRow.appendChild(chatSend);
+      chatWrap.appendChild(chatRow);
+      side.appendChild(chatWrap);
+    }
+
     // "Meine Partien"-Umschalter in der Seitenleiste
     this.myGamesEl = el('div', 'cd-mygames');
     side.appendChild(this.myGamesEl);
@@ -398,6 +450,7 @@
     this.updateShare();
     this.startClock();
     this.renderMyGames();
+    this.renderChat();
   };
 
   ChessDuell.prototype.reset = function () {
@@ -729,6 +782,7 @@
     this.updateShare();
     this.renderClocks();
     this.renderMyGames();
+    this.renderChat();
   };
 
   // ---------- Polling ----------
@@ -760,6 +814,7 @@
         self.updateShare();
         self.updateStatus();
         self.renderClocks();
+        self.renderChat();
       }
     }).catch(function () { /* still */ });
   };

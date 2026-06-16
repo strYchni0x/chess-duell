@@ -3,7 +3,7 @@
  * Plugin Name:       Chess Duell
  * Plugin URI:        https://github.com/strYchni0x/chess-duell
  * Description:        Zwei Menschen spielen online Schach gegeneinander – Partie einfach per Link teilen. Anzahl gleichzeitiger Partien und Laufzeit im Backend einstellbar. Serverseitige Regelprüfung (kein Cheaten möglich), keine KI. Einbinden mit dem Shortcode [chess_duell].
- * Version:           1.7.0
+ * Version:           1.8.0
  * Author:            Florian Willnat
  * License:           GPL-2.0-or-later
  * License URI:       https://www.gnu.org/licenses/gpl-2.0.html
@@ -14,7 +14,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('CHESS_DUELL_VERSION', '1.7.0');
+define('CHESS_DUELL_VERSION', '1.8.0');
 define('CHESS_DUELL_URL', plugin_dir_url(__FILE__));
 define('CHESS_DUELL_PATH', plugin_dir_path(__FILE__));
 define('CHESS_DUELL_OPTION', 'chess_duell_games');
@@ -118,6 +118,8 @@ function chess_duell_normalize_game($game) {
         'black_user'    => 0,
         'white_cid'     => '',
         'black_cid'     => '',
+        // Chat (nur zwischen den beiden Spielern): Liste von {color,name,text,time}
+        'messages'      => array(),
         'status'        => 'waiting',
         'result'        => null,
         'result_type'   => null,
@@ -157,9 +159,12 @@ function chess_duell_prune($games) {
     return $games;
 }
 
-/** Öffentliche Sicht eines Spiels (ohne geheime Tokens). */
-function chess_duell_public_state($game) {
-    return array(
+/**
+ * Öffentliche Sicht eines Spiels (ohne geheime Tokens).
+ * $include_chat = true nur für die beiden Spieler (Chat ist privat).
+ */
+function chess_duell_public_state($game, $include_chat = false) {
+    $state = array(
         'id'           => $game['id'],
         'fen'          => $game['fen'],
         'turn'         => $game['turn'],
@@ -176,6 +181,24 @@ function chess_duell_public_state($game) {
         'clock'        => chess_duell_clock_public($game),
         'updated'      => intval($game['updated']),
     );
+    if ($include_chat) {
+        $state['messages'] = array_values(isset($game['messages']) ? $game['messages'] : array());
+    }
+    return $state;
+}
+
+/** Welche Farbe gehört zum Token? 'w'/'b' oder null. */
+function chess_duell_color_for_token($game, $token) {
+    if ($token === '' || $token === null) {
+        return null;
+    }
+    if (hash_equals($game['white_token'], (string) $token)) {
+        return 'w';
+    }
+    if (!empty($game['black_token']) && hash_equals($game['black_token'], (string) $token)) {
+        return 'b';
+    }
+    return null;
 }
 
 /* ------------------------------------------------------------------ *
@@ -405,6 +428,12 @@ add_action('rest_api_init', function () {
         'permission_callback' => '__return_true',
     ));
 
+    register_rest_route($ns, '/game/(?P<id>[a-f0-9]{6,32})/chat', array(
+        'methods'             => 'POST',
+        'callback'            => 'chess_duell_rest_chat',
+        'permission_callback' => '__return_true',
+    ));
+
     register_rest_route($ns, '/mygames', array(
         'methods'             => 'GET',
         'callback'            => 'chess_duell_rest_mygames',
@@ -545,7 +574,7 @@ function chess_duell_rest_create($req) {
         'id'    => $id,
         'token' => $wtoken,
         'color' => 'white',
-        'state' => chess_duell_public_state($game),
+        'state' => chess_duell_public_state($game, true),
     );
 }
 
@@ -560,19 +589,15 @@ function chess_duell_rest_get($req) {
 
     // Heartbeat: Token bestimmt die eigene Farbe -> Online-Zeit der Uhr buchen.
     $token = (string) $req->get_param('t');
-    $color = null;
-    if ($token !== '' && hash_equals($game['white_token'], $token)) {
-        $color = 'w';
-    } elseif ($token !== '' && !empty($game['black_token']) && hash_equals($game['black_token'], $token)) {
-        $color = 'b';
-    }
+    $color = chess_duell_color_for_token($game, $token);
     if (!empty($game['clock_enabled'])) {
         chess_duell_account_clock($game, $color, chess_duell_now_ms());
     }
 
     $games[$id] = $game;
     chess_duell_save_games($games);
-    return chess_duell_public_state($game);
+    // Chat nur an die beiden Spieler ausliefern (Token vorhanden).
+    return chess_duell_public_state($game, $color !== null);
 }
 
 function chess_duell_rest_join($req) {
@@ -596,7 +621,7 @@ function chess_duell_rest_join($req) {
         if ($hasName && $name !== '' && $name !== $game['white_name']) { $game['white_name'] = $name; $changed = true; }
         if ($hasEmail && $email !== $game['white_email']) { $game['white_email'] = $email; $changed = true; }
         if ($changed) { $games[$id] = $game; chess_duell_save_games($games); }
-        return array('color' => 'white', 'token' => $token, 'state' => chess_duell_public_state($game));
+        return array('color' => 'white', 'token' => $token, 'state' => chess_duell_public_state($game, true));
     }
     // Bekanntes Token (Schwarz)?
     if ($token !== '' && !empty($game['black_token']) && hash_equals($game['black_token'], $token)) {
@@ -604,7 +629,7 @@ function chess_duell_rest_join($req) {
         if ($hasName && $name !== '' && $name !== $game['black_name']) { $game['black_name'] = $name; $changed = true; }
         if ($hasEmail && $email !== $game['black_email']) { $game['black_email'] = $email; $changed = true; }
         if ($changed) { $games[$id] = $game; chess_duell_save_games($games); }
-        return array('color' => 'black', 'token' => $token, 'state' => chess_duell_public_state($game));
+        return array('color' => 'black', 'token' => $token, 'state' => chess_duell_public_state($game, true));
     }
 
     // Noch kein Schwarzer? -> als Schwarz beitreten.
@@ -634,7 +659,7 @@ function chess_duell_rest_join($req) {
         chess_duell_notify_turn($game, 'w');
         $games[$id] = $game; // notify kann last_notify_w gesetzt haben
         chess_duell_save_games($games);
-        return array('color' => 'black', 'token' => $btoken, 'state' => chess_duell_public_state($game));
+        return array('color' => 'black', 'token' => $btoken, 'state' => chess_duell_public_state($game, true));
     }
 
     // Partie voll -> Zuschauer.
@@ -695,7 +720,7 @@ function chess_duell_rest_move($req) {
         if ($game['status'] === 'finished') {
             $games[$id] = $game;
             chess_duell_save_games($games);
-            return chess_duell_public_state($game);
+            return chess_duell_public_state($game, true);
         }
     }
 
@@ -763,7 +788,7 @@ function chess_duell_rest_move($req) {
         chess_duell_save_games($games);
     }
 
-    return chess_duell_public_state($game);
+    return chess_duell_public_state($game, true);
 }
 
 function chess_duell_rest_resign($req) {
@@ -797,7 +822,44 @@ function chess_duell_rest_resign($req) {
         chess_duell_save_games($games);
     }
 
-    return chess_duell_public_state($game);
+    return chess_duell_public_state($game, true);
+}
+
+/** Chat-Nachricht (nur die beiden Spieler dürfen schreiben). */
+function chess_duell_rest_chat($req) {
+    $games = chess_duell_prune(chess_duell_load_games());
+    $id    = $req['id'];
+    if (!isset($games[$id])) {
+        return new WP_Error('chess_duell_not_found', 'Partie nicht gefunden oder abgelaufen.', array('status' => 404));
+    }
+    $game  = $games[$id];
+    $body  = $req->get_json_params();
+    $token = isset($body['token']) ? (string) $body['token'] : '';
+    $color = chess_duell_color_for_token($game, $token);
+    if ($color === null) {
+        return new WP_Error('chess_duell_forbidden', 'Kein gültiges Spieler-Token.', array('status' => 403));
+    }
+
+    $text = isset($body['text']) ? sanitize_text_field((string) $body['text']) : '';
+    $text = trim($text);
+    if ($text === '') {
+        return new WP_Error('chess_duell_empty', 'Leere Nachricht.', array('status' => 400));
+    }
+    $text = function_exists('mb_substr') ? mb_substr($text, 0, 500) : substr($text, 0, 500);
+
+    $name = ($color === 'w')
+        ? ($game['white_name'] !== '' ? $game['white_name'] : 'Weiß')
+        : ($game['black_name'] !== '' ? $game['black_name'] : 'Schwarz');
+
+    $game['messages'][] = array('color' => $color, 'name' => $name, 'text' => $text, 'time' => time());
+    if (count($game['messages']) > 300) {
+        $game['messages'] = array_slice($game['messages'], -300);
+    }
+    $game['updated'] = time();
+
+    $games[$id] = $game;
+    chess_duell_save_games($games);
+    return chess_duell_public_state($game, true);
 }
 
 /* ------------------------------------------------------------------ *
