@@ -177,16 +177,28 @@ class Chess_Duell_GitHub_Updater {
      * (sonst entstünde ein neues Verzeichnis).
      */
     public function fix_source_dir($source, $remote_source, $upgrader, $hook_extra = array()) {
-        if (!isset($hook_extra['plugin']) || $hook_extra['plugin'] !== $this->basename) {
-            return $source;
-        }
         global $wp_filesystem;
         if (!$wp_filesystem) {
             return $source;
         }
+        // Gehört dieses Update zu unserem Plugin? Primär über hook_extra, sonst
+        // als Fallback daran erkennen, dass der entpackte Ordner unsere
+        // Hauptdatei enthält (GitHub-ZIP entpackt nach "repo-<ref>").
+        $is_ours = (isset($hook_extra['plugin']) && $hook_extra['plugin'] === $this->basename);
+        if (!$is_ours) {
+            $main_file = basename($this->basename); // z. B. "chess-duell.php"
+            if (!$wp_filesystem->exists(trailingslashit($source) . $main_file)) {
+                return $source;
+            }
+        }
         $desired = trailingslashit($remote_source) . $this->slug;
         if (untrailingslashit($source) === untrailingslashit($desired)) {
             return $source;
+        }
+        // Doppelten Zielordner vermeiden: vorhandenes Ziel im Arbeitsverzeichnis
+        // entfernen, dann den entpackten Ordner auf den Plugin-Slug umbenennen.
+        if ($wp_filesystem->exists($desired)) {
+            $wp_filesystem->delete(untrailingslashit($desired), true);
         }
         if ($wp_filesystem->move(untrailingslashit($source), untrailingslashit($desired), true)) {
             return trailingslashit($desired);
