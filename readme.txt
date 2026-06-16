@@ -4,7 +4,7 @@ Tags: chess, game, board game, two player
 Requires at least: 5.6
 Tested up to: 7.0
 Requires PHP: 7.2
-Stable tag: 1.5.5
+Stable tag: 1.5.6
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -78,6 +78,9 @@ or expires after the inactivity period configured in the backend (default 14 day
 
 == Changelog ==
 
+= 1.5.6 =
+* Plugin Check polish: removed manual load_plugin_textdomain() (auto-loaded via headers) and hardened the $_GET read in the shortcode (wp_unslash + sanitize).
+
 = 1.5.5 =
 * Added translators comments for placeholder strings (i18n) and updated "Tested up to".
 
@@ -115,5 +118,5 @@ or expires after the inactivity period configured in the backend (default 14 day
 
 == Upgrade Notice ==
 
-= 1.5.5 =
-Internationalization polish (translators comments) and compatibility with current WordPress.
+= 1.5.6 =
+Code-quality polish for the WordPress Plugin Check (i18n loading and input handling).
