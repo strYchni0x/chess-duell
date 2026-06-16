@@ -70,6 +70,29 @@
   function pageUrl() {
     return window.location.origin + window.location.pathname;
   }
+  // Anonyme, dauerhafte Gast-Browser-ID (kein Personenbezug) für die Zuordnung
+  // mehrerer Partien desselben Browsers.
+  function getCid() {
+    try {
+      var c = localStorage.getItem('chessduell_cid');
+      if (!c) {
+        c = (Date.now().toString(36) + Math.random().toString(36).slice(2, 12)).replace(/[^a-z0-9]/g, '');
+        localStorage.setItem('chessduell_cid', c);
+      }
+      return c;
+    } catch (e) { return ''; }
+  }
+  // Query-Parameter an einen REST-Pfad hängen (Trenner je nach restUrl-Form).
+  function withParams(path, params) {
+    var sep = (CFG.restUrl && CFG.restUrl.indexOf('?') !== -1) ? '&' : '?';
+    var qs = [];
+    for (var k in params) {
+      if (params.hasOwnProperty(k) && params[k] !== '' && params[k] != null) {
+        qs.push(encodeURIComponent(k) + '=' + encodeURIComponent(params[k]));
+      }
+    }
+    return qs.length ? path + sep + qs.join('&') : path;
+  }
 
   // Schachuhr-Voreinstellungen (Basiszeit Minuten + Inkrement Sekunden je Zug).
   var CLOCK_PRESETS = [
@@ -168,7 +191,7 @@
       saveName(nm);
       saveEmail(em);
       api('game', 'POST', {
-        name: nm, email: em, page: pageUrl(),
+        name: nm, email: em, page: pageUrl(), cid: getCid(),
         clock_base: preset.base, clock_inc: preset.inc
       }).then(function (data) {
         saveIdentity(data.id, { token: data.token, color: data.color });
@@ -183,6 +206,11 @@
     box.appendChild(btn);
     box.appendChild(msg);
     r.appendChild(box);
+
+    // "Meine Partien"-Umschalter (eigene offene/letzte Partien dieses Browsers/Kontos)
+    this.myGamesEl = el('div', 'cd-mygames');
+    r.appendChild(this.myGamesEl);
+    this.renderMyGames();
   };
 
   ChessDuell.prototype.gameUrl = function (id) {
@@ -191,12 +219,52 @@
     return u.toString();
   };
 
+  // ---------- "Meine Partien"-Umschalter ----------
+  ChessDuell.prototype.renderMyGames = function () {
+    var container = this.myGamesEl;
+    if (!container) { return; }
+    var self = this;
+    api(withParams('mygames', { cid: getCid() })).then(function (list) {
+      container.innerHTML = '';
+      if (!list || !list.length) { container.style.display = 'none'; return; }
+      container.style.display = '';
+      container.appendChild(el('div', 'cd-mygames-title', 'Meine Partien'));
+      var listEl = el('div', 'cd-mygames-list');
+      list.forEach(function (g) {
+        var statusTxt = g.status === 'finished' ? 'beendet'
+          : (!g.has_black ? 'wartet auf Gegner' : (g.your_turn ? 'du bist am Zug' : 'Gegner am Zug'));
+        var vs = g.opponent ? ('vs ' + g.opponent) : 'neue Partie';
+        var cls = 'cd-mygames-item' + (g.id === self.gameId ? ' cd-current' : '') + (g.your_turn ? ' cd-turnflag' : '');
+        var item = el('button', cls, (g.color === 'white' ? '♔ ' : '♚ ') + vs + ' — ' + statusTxt);
+        item.addEventListener('click', function () { self.switchGame(g.id); });
+        listEl.appendChild(item);
+      });
+      container.appendChild(listEl);
+    }).catch(function () { /* still */ });
+  };
+
+  // Im selben Fenster zu einer anderen eigenen Partie wechseln (ohne Neuladen).
+  ChessDuell.prototype.switchGame = function (id) {
+    if (!id || id === this.gameId) { return; }
+    this.stopPolling();
+    this.stopClock();
+    this.engine = new Engine();
+    this.appliedMoves = 0;
+    this.selected = null;
+    this.legalCache = [];
+    this.pendingPromo = null;
+    this.state = null;
+    this.clockState = { enabled: false };
+    history.replaceState(null, '', this.gameUrl(id));
+    this.enterGame(id);
+  };
+
   // ---------- Partie betreten ----------
   ChessDuell.prototype.enterGame = function (id) {
     var self = this;
     this.gameId = id;
     var ident = loadIdentity(id);
-    var body = { page: pageUrl() };
+    var body = { page: pageUrl(), cid: getCid() };
     if (ident && ident.token) { body.token = ident.token; }
     var myName = defaultName();
     if (myName) { body.name = myName; }
@@ -313,6 +381,11 @@
     });
     controls.appendChild(newBtn);
     side.appendChild(controls);
+
+    // "Meine Partien"-Umschalter in der Seitenleiste
+    this.myGamesEl = el('div', 'cd-mygames');
+    side.appendChild(this.myGamesEl);
+
     wrap.appendChild(side);
 
     this.promoEl = el('div', 'cd-promo cd-hidden');
@@ -324,6 +397,7 @@
     this.updateMoveList();
     this.updateShare();
     this.startClock();
+    this.renderMyGames();
   };
 
   ChessDuell.prototype.reset = function () {
@@ -654,6 +728,7 @@
     this.updateMoveList();
     this.updateShare();
     this.renderClocks();
+    this.renderMyGames();
   };
 
   // ---------- Polling ----------

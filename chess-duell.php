@@ -3,7 +3,7 @@
  * Plugin Name:       Chess Duell
  * Plugin URI:        https://github.com/strYchni0x/chess-duell
  * Description:        Zwei Menschen spielen online Schach gegeneinander – Partie einfach per Link teilen. Anzahl gleichzeitiger Partien und Laufzeit im Backend einstellbar. Serverseitige Regelprüfung (kein Cheaten möglich), keine KI. Einbinden mit dem Shortcode [chess_duell].
- * Version:           1.6.1
+ * Version:           1.7.0
  * Author:            Florian Willnat
  * License:           GPL-2.0-or-later
  * License URI:       https://www.gnu.org/licenses/gpl-2.0.html
@@ -14,7 +14,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('CHESS_DUELL_VERSION', '1.6.1');
+define('CHESS_DUELL_VERSION', '1.7.0');
 define('CHESS_DUELL_URL', plugin_dir_url(__FILE__));
 define('CHESS_DUELL_PATH', plugin_dir_path(__FILE__));
 define('CHESS_DUELL_OPTION', 'chess_duell_games');
@@ -113,6 +113,11 @@ function chess_duell_normalize_game($game) {
         'black_name'    => '',
         'white_email'   => '',
         'black_email'   => '',
+        // Spieler-Zuordnung: WP-User-ID (0 = Gast) + anonyme Gast-Browser-ID
+        'white_user'    => 0,
+        'black_user'    => 0,
+        'white_cid'     => '',
+        'black_cid'     => '',
         'status'        => 'waiting',
         'result'        => null,
         'result_type'   => null,
@@ -205,6 +210,12 @@ function chess_duell_sanitize_name($name) {
 function chess_duell_sanitize_email($email) {
     $email = sanitize_email((string) $email);
     return ($email && is_email($email)) ? $email : '';
+}
+
+/** Anonyme Gast-Browser-ID bereinigen ([a-z0-9], max. 32 Zeichen). */
+function chess_duell_sanitize_cid($cid) {
+    $cid = preg_replace('/[^a-z0-9]/', '', strtolower((string) $cid));
+    return substr($cid, 0, 32);
 }
 
 /** Hinterlegte E-Mail des angemeldeten WP-Nutzers (sonst leer). */
@@ -393,7 +404,60 @@ add_action('rest_api_init', function () {
         'callback'            => 'chess_duell_rest_resign',
         'permission_callback' => '__return_true',
     ));
+
+    register_rest_route($ns, '/mygames', array(
+        'methods'             => 'GET',
+        'callback'            => 'chess_duell_rest_mygames',
+        'permission_callback' => '__return_true',
+    ));
 });
+
+/**
+ * Liefert die Partien des Anfragenden (über WP-User-ID und/oder Gast-Browser-ID).
+ * Gibt keine Tokens zurück – nur Anzeige-Infos für den "Meine Partien"-Umschalter.
+ */
+function chess_duell_rest_mygames($req) {
+    $games = chess_duell_prune(chess_duell_load_games());
+    chess_duell_save_games($games);
+
+    $uid = get_current_user_id();
+    $cid = chess_duell_sanitize_cid((string) $req->get_param('cid'));
+    $out = array();
+
+    foreach ($games as $g) {
+        $color = null;
+        if ($uid > 0 && intval($g['white_user']) === $uid) {
+            $color = 'white';
+        } elseif ($uid > 0 && intval($g['black_user']) === $uid) {
+            $color = 'black';
+        } elseif ($cid !== '' && $g['white_cid'] === $cid) {
+            $color = 'white';
+        } elseif ($cid !== '' && $g['black_cid'] === $cid) {
+            $color = 'black';
+        }
+        if ($color === null) {
+            continue;
+        }
+        $opponent = ($color === 'white')
+            ? (!empty($g['black_token']) ? ($g['black_name'] !== '' ? $g['black_name'] : 'Schwarz') : '')
+            : ($g['white_name'] !== '' ? $g['white_name'] : 'Weiß');
+        $my_code   = ($color === 'white') ? 'w' : 'b';
+        $your_turn = ($g['status'] !== 'finished' && !empty($g['black_token']) && $g['turn'] === $my_code);
+
+        $out[] = array(
+            'id'        => $g['id'],
+            'color'     => $color,
+            'opponent'  => $opponent,
+            'status'    => $g['status'],
+            'result'    => $g['result'],
+            'has_black' => !empty($g['black_token']),
+            'your_turn' => $your_turn,
+            'updated'   => intval($g['updated']),
+        );
+    }
+    usort($out, function ($a, $b) { return $b['updated'] - $a['updated']; });
+    return $out;
+}
 
 function chess_duell_rest_create($req) {
     $games = chess_duell_prune(chess_duell_load_games());
@@ -440,6 +504,7 @@ function chess_duell_rest_create($req) {
     $inc_ms  = $inc_sec * 1000;
 
     $page = isset($body['page']) ? esc_url_raw((string) $body['page']) : '';
+    $cid  = chess_duell_sanitize_cid(isset($body['cid']) ? $body['cid'] : '');
 
     $now  = time();
     $game = chess_duell_normalize_game(array(
@@ -453,6 +518,10 @@ function chess_duell_rest_create($req) {
         'black_name'    => '',
         'white_email'   => $email,
         'black_email'   => '',
+        'white_user'    => get_current_user_id(),
+        'black_user'    => 0,
+        'white_cid'     => $cid,
+        'black_cid'     => '',
         'status'        => 'waiting',
         'result'        => null,
         'result_type'   => null,
@@ -549,6 +618,8 @@ function chess_duell_rest_join($req) {
         $game['black_token'] = $btoken;
         $game['black_name']  = ($name !== '') ? $name : chess_duell_default_name();
         $game['black_email'] = $email;
+        $game['black_user']  = get_current_user_id();
+        $game['black_cid']   = chess_duell_sanitize_cid(isset($body['cid']) ? $body['cid'] : '');
         $game['status']      = ($game['status'] === 'waiting') ? 'active' : $game['status'];
         $game['updated']     = time();
         // Schachuhr startet jetzt (Weiß am Zug); Anwesenheit initialisieren.
@@ -889,7 +960,15 @@ function chess_duell_render_games_table($games) {
                 $status .= ' (' . $g['result'] . ')';
             }
             $white = $g['white_name'] !== '' ? $g['white_name'] : 'Weiß';
+            if (!empty($g['white_user'])) {
+                $wu = get_userdata(intval($g['white_user']));
+                if ($wu) { $white .= ' (@' . $wu->user_login . ')'; }
+            }
             $black = !empty($g['black_token']) ? ($g['black_name'] !== '' ? $g['black_name'] : 'Schwarz') : '—';
+            if (!empty($g['black_user'])) {
+                $bu = get_userdata(intval($g['black_user']));
+                if ($bu) { $black .= ' (@' . $bu->user_login . ')'; }
+            }
             $turn  = $g['status'] === 'finished' ? '—' : ($g['turn'] === 'w' ? 'Weiß' : 'Schwarz');
             $clock = !empty($g['clock_enabled']) ? (intval($g['clock_base'] / 60000) . ' Min'
                      . (intval($g['clock_inc']) > 0 ? ' +' . intval($g['clock_inc'] / 1000) . ' Sek' : '')) : '—';

@@ -4,7 +4,7 @@ Tags: chess, schach, game, multiplayer, spiel
 Requires at least: 5.6
 Tested up to: 7.0
 Requires PHP: 7.2
-Stable tag: 1.6.1
+Stable tag: 1.7.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -62,6 +62,10 @@ illegalen Zug durchsetzen. Spieler-Identitäten werden über ein geheimes Token
 im Link/Local-Storage des Browsers verwaltet.
 
 == Changelog ==
+
+= 1.7.0 =
+* Neuer "Meine Partien"-Umschalter: Spieler mit mehreren offenen Partien können im selben Fenster ohne Neuladen wechseln (mit "du bist am Zug"-Markierung).
+* Partien werden Spielern zugeordnet: WP-User-ID bei angemeldeten Nutzern und eine anonyme Gast-Browser-ID. Backend-Übersicht zeigt das Konto (@login).
 
 = 1.6.1 =
 * Fix GitHub-Updater: Updates ersetzen jetzt zuverlässig den vorhandenen Plugin-Ordner, statt einen zweiten anzulegen (verhindert doppelte Installationen / Aktivierungsfehler).
