@@ -3,7 +3,7 @@
  * Plugin Name:       Chess Duell
  * Plugin URI:        https://github.com/strYchni0x/chess-duell
  * Description:        Two people play chess online against each other – just share a link. Number of concurrent games and lifetime configurable in the backend. Server-side rule validation (no cheating), no AI. Embed with the shortcode [chess_duell].
- * Version:           1.5.4
+ * Version:           1.5.5
  * Author:            Florian Willnat
  * License:           GPL-2.0-or-later
  * License URI:       https://www.gnu.org/licenses/gpl-2.0.html
@@ -15,7 +15,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('CHESS_DUELL_VERSION', '1.5.4');
+define('CHESS_DUELL_VERSION', '1.5.5');
 define('CHESS_DUELL_URL', plugin_dir_url(__FILE__));
 define('CHESS_DUELL_PATH', plugin_dir_path(__FILE__));
 define('CHESS_DUELL_OPTION', 'chess_duell_games');
@@ -61,8 +61,10 @@ function chess_duell_js_i18n() {
         'Used only to notify you when it is your turn, and automatically deleted when the game ends – not stored permanently. Note: like any input, the address is technically visible in the server log.' => __('Used only to notify you when it is your turn, and automatically deleted when the game ends – not stored permanently. Note: like any input, the address is technically visible in the server log.', 'chess-duell'),
         'Start new game' => __('Start new game', 'chess-duell'),
         'Creating game …' => __('Creating game …', 'chess-duell'),
+        /* translators: %s: error message */
         'Error: %s' => __('Error: %s', 'chess-duell'),
         'Connecting to game …' => __('Connecting to game …', 'chess-duell'),
+        /* translators: %s: error message */
         'Could not load game: %s' => __('Could not load game: %s', 'chess-duell'),
         'Back to lobby' => __('Back to lobby', 'chess-duell'),
         'Move list' => __('Move list', 'chess-duell'),
@@ -89,16 +91,19 @@ function chess_duell_js_i18n() {
         ' (stalemate)' => __(' (stalemate)', 'chess-duell'),
         ' (fifty-move rule)' => __(' (fifty-move rule)', 'chess-duell'),
         ' (insufficient material)' => __(' (insufficient material)', 'chess-duell'),
+        /* translators: %s: player name */
         'Victory – %s wins' => __('Victory – %s wins', 'chess-duell'),
         ' (on time)' => __(' (on time)', 'chess-duell'),
         ' (by resignation)' => __(' (by resignation)', 'chess-duell'),
         ' (checkmate)' => __(' (checkmate)', 'chess-duell'),
         'Game over' => __('Game over', 'chess-duell'),
+        /* translators: %s: player name */
         'Checkmate – %s wins' => __('Checkmate – %s wins', 'chess-duell'),
         'Stalemate – draw' => __('Stalemate – draw', 'chess-duell'),
         'Fifty-move rule – draw' => __('Fifty-move rule – draw', 'chess-duell'),
         'Draw (insufficient material)' => __('Draw (insufficient material)', 'chess-duell'),
         'Waiting for opponent …' => __('Waiting for opponent …', 'chess-duell'),
+        /* translators: %s: player name (whose turn it is) */
         'On move: %s' => __('On move: %s', 'chess-duell'),
         ' (you)' => __(' (you)', 'chess-duell'),
         ' – Check!' => __(' – Check!', 'chess-duell'),

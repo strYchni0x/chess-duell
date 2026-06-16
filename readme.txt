@@ -2,9 +2,9 @@
 Contributors: strychni0x
 Tags: chess, game, board game, two player
 Requires at least: 5.6
-Tested up to: 6.8
+Tested up to: 7.0
 Requires PHP: 7.2
-Stable tag: 1.5.4
+Stable tag: 1.5.5
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -78,6 +78,9 @@ or expires after the inactivity period configured in the backend (default 14 day
 
 == Changelog ==
 
+= 1.5.5 =
+* Added translators comments for placeholder strings (i18n) and updated "Tested up to".
+
 = 1.5.4 =
 * Fix: configuration (REST URL) is also passed via a data attribute – now works even with a Content-Security-Policy or script optimizers that strip inline scripts.
 
@@ -112,5 +115,5 @@ or expires after the inactivity period configured in the backend (default 14 day
 
 == Upgrade Notice ==
 
-= 1.5.4 =
-Fix for sites with a Content-Security-Policy or script optimizers (configuration is now passed via a data attribute).
+= 1.5.5 =
+Internationalization polish (translators comments) and compatibility with current WordPress.
