@@ -4,7 +4,7 @@ Tags: chess, schach, game, multiplayer, spiel
 Requires at least: 5.6
 Tested up to: 7.0
 Requires PHP: 7.2
-Stable tag: 1.5.5
+Stable tag: 1.5.6
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -62,6 +62,9 @@ illegalen Zug durchsetzen. Spieler-Identitäten werden über ein geheimes Token
 im Link/Local-Storage des Browsers verwaltet.
 
 == Changelog ==
+
+= 1.5.6 =
+* Code-Qualität: GET-Eingabe im Shortcode abgesichert (wp_unslash + sanitize).
 
 = 1.5.5 =
 * "Tested up to" auf aktuelle WordPress-Version angehoben; kleinere Aufräumarbeiten.

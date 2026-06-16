@@ -3,7 +3,7 @@
  * Plugin Name:       Chess Duell
  * Plugin URI:        https://github.com/strYchni0x/chess-duell
  * Description:        Zwei Menschen spielen online Schach gegeneinander – Partie einfach per Link teilen. Anzahl gleichzeitiger Partien und Laufzeit im Backend einstellbar. Serverseitige Regelprüfung (kein Cheaten möglich), keine KI. Einbinden mit dem Shortcode [chess_duell].
- * Version:           1.5.5
+ * Version:           1.5.6
  * Author:            Florian Willnat
  * License:           GPL-2.0-or-later
  * License URI:       https://www.gnu.org/licenses/gpl-2.0.html
@@ -14,7 +14,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('CHESS_DUELL_VERSION', '1.5.5');
+define('CHESS_DUELL_VERSION', '1.5.6');
 define('CHESS_DUELL_URL', plugin_dir_url(__FILE__));
 define('CHESS_DUELL_PATH', plugin_dir_path(__FILE__));
 define('CHESS_DUELL_OPTION', 'chess_duell_games');
@@ -798,7 +798,10 @@ function chess_duell_shortcode($atts) {
     wp_enqueue_script('chess-duell-engine');
     wp_enqueue_script('chess-duell-app');
 
-    $game_id = isset($_GET['chess_game']) ? preg_replace('/[^a-f0-9]/', '', (string) $_GET['chess_game']) : '';
+    // Reiner Lesezugriff der Partie-ID aus der URL (keine Formularverarbeitung -> keine Nonce nötig).
+    // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+    $game_id = isset($_GET['chess_game']) ? sanitize_text_field(wp_unslash($_GET['chess_game'])) : '';
+    $game_id = preg_replace('/[^a-f0-9]/', '', $game_id);
 
     $config = array(
         'restUrl'   => esc_url_raw(rest_url('chess-duell/v1/')),
