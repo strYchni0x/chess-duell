@@ -4,7 +4,7 @@ Tags: chess, schach, game, multiplayer, spiel
 Requires at least: 5.6
 Tested up to: 7.0
 Requires PHP: 7.2
-Stable tag: 1.9.1
+Stable tag: 1.10.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -62,6 +62,9 @@ illegalen Zug durchsetzen. Spieler-Identitäten werden über ein geheimes Token
 im Link/Local-Storage des Browsers verwaltet.
 
 == Changelog ==
+
+= 1.10.0 =
+* Neu: "Auf anderem Gerät weiterspielen" – jeder Spieler kann einen persönlichen Link erzeugen und sich selbst schicken (z. B. vom PC ans Handy), um als dieselbe Farbe weiterzuspielen. Das Token wird beim Öffnen übernommen und sofort aus der URL entfernt.
 
 = 1.9.1 =
 * Fix: Brett wurde bei der neuen Aufteilung zu klein und die unterste Reihe abgeschnitten. Brett sitzt jetzt groß oben, Zugliste und Chat nebeneinander darunter; Brett bleibt immer vollständig quadratisch.

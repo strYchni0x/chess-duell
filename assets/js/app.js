@@ -145,6 +145,18 @@
   ChessDuell.prototype.init = function () {
     var params = new URLSearchParams(window.location.search);
     var id = params.get('chess_game') || CFG.gameId || null;
+    // Übergabe-Link von einem anderen Gerät: enthält das eigene Spieler-Token.
+    // Identität übernehmen und das Token sofort aus der sichtbaren URL entfernen,
+    // damit es nicht versehentlich weitergegeben oder neu geteilt wird.
+    var resumeToken = params.get('chess_token');
+    if (id && resumeToken) {
+      saveIdentity(id, { token: resumeToken, color: null });
+      try {
+        var u = new URL(window.location.href);
+        u.searchParams.delete('chess_token');
+        history.replaceState(null, '', u.toString());
+      } catch (e) { /* ältere Browser: URL bleibt stehen, funktioniert trotzdem */ }
+    }
     if (id) { this.enterGame(id); }
     else { this.renderLobby(); }
   };
@@ -225,6 +237,14 @@
   ChessDuell.prototype.gameUrl = function (id) {
     var u = new URL(window.location.href);
     u.searchParams.set('chess_game', id);
+    return u.toString();
+  };
+
+  // Link zum Weiterspielen auf einem anderen Gerät – enthält die eigene
+  // Spieler-Identität (Token). Nur für die beiden Spieler sinnvoll.
+  ChessDuell.prototype.continueUrl = function () {
+    var u = new URL(this.gameUrl(this.gameId));
+    if (this.token) { u.searchParams.set('chess_token', this.token); }
     return u.toString();
   };
 
@@ -423,6 +443,38 @@
     controls.appendChild(optWrap);
 
     if (this.color === 'white' || this.color === 'black') {
+      // Auf anderem Gerät weiterspielen: Link mit eigener Identität (Token) erzeugen.
+      var contWrap = el('div', 'cd-continue');
+      var contBtn = el('button', 'cd-btn', 'Auf anderem Gerät weiterspielen');
+      contWrap.appendChild(contBtn);
+      var contBox = el('div', 'cd-continue-box cd-hidden');
+      contBox.appendChild(el('div', 'cd-muted',
+        'Öffne diesen Link auf deinem anderen Gerät (z. B. Handy), um als '
+        + (this.color === 'white' ? 'Weiß' : 'Schwarz') + ' weiterzuspielen:'));
+      var contInput = el('input', 'cd-link');
+      contInput.type = 'text';
+      contInput.readOnly = true;
+      contInput.addEventListener('focus', function () { this.select(); });
+      contBox.appendChild(contInput);
+      var contCopy = el('button', 'cd-btn', 'Link kopieren');
+      contCopy.addEventListener('click', function () {
+        contInput.select();
+        if (navigator.clipboard) { navigator.clipboard.writeText(contInput.value); }
+        else { document.execCommand('copy'); }
+        contCopy.textContent = 'Kopiert!';
+        setTimeout(function () { contCopy.textContent = 'Link kopieren'; }, 1500);
+      });
+      contBox.appendChild(contCopy);
+      contBox.appendChild(el('div', 'cd-hint',
+        'Wichtig: Wer diesen Link hat, kann an deiner Stelle spielen. Schick ihn nur dir selbst.'));
+      contWrap.appendChild(contBox);
+      contBtn.addEventListener('click', function () {
+        contInput.value = self.continueUrl();
+        contBox.classList.toggle('cd-hidden');
+        if (!contBox.classList.contains('cd-hidden')) { contInput.focus(); }
+      });
+      controls.appendChild(contWrap);
+
       var nameWrap = el('div', 'cd-name-edit');
       nameWrap.appendChild(el('label', 'cd-name-label', 'Dein Name'));
       var nameField = el('input', 'cd-name-input');
