@@ -9,3 +9,5 @@
 *.ico binary
 *.zip binary
 *.jks binary
+# Kompilierte Übersetzungen (Binärformat) – nie als Text normalisieren
+*.mo binary

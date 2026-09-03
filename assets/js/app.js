@@ -4,6 +4,12 @@
 (function () {
   'use strict';
 
+  // i18n: WordPress wp.i18n nutzen, mit Fallback (zeigt Quell-String).
+  var __ = ( window.wp && window.wp.i18n && window.wp.i18n.__ ) ? window.wp.i18n.__ : function ( s ) { return s; };
+  // Mini-sprintf: ersetzt das erste %s – so bleiben Sätze mit Variablen als
+  // Ganzes übersetzbar (Wortstellung darf sich je Sprache ändern).
+  function fmt(s, v) { return s.replace('%s', v); }
+
   var Engine = window.ChessDuellEngine;
   var CFG = window.ChessDuellConfig || {};
   var POLL_MS = 2000;
@@ -19,8 +25,8 @@
   }
 
   var GLYPH = { k: '♚', q: '♛', r: '♜', b: '♝', n: '♞', p: '♟' };
-  var PIECE_NAME = { k: 'König', q: 'Dame', r: 'Turm', b: 'Läufer', n: 'Springer', p: 'Bauer' };
-  var PROMO_LABEL = { q: 'Dame', r: 'Turm', b: 'Läufer', n: 'Springer' };
+  var PIECE_NAME = { k: __('King', 'human2human-chess-duell'), q: __('Queen', 'human2human-chess-duell'), r: __('Rook', 'human2human-chess-duell'), b: __('Bishop', 'human2human-chess-duell'), n: __('Knight', 'human2human-chess-duell'), p: __('Pawn', 'human2human-chess-duell') };
+  var PROMO_LABEL = { q: __('Queen', 'human2human-chess-duell'), r: __('Rook', 'human2human-chess-duell'), b: __('Bishop', 'human2human-chess-duell'), n: __('Knight', 'human2human-chess-duell') };
 
   function el(tag, cls, txt) {
     var e = document.createElement(tag);
@@ -47,6 +53,23 @@
   }
   function saveIdentity(id, data) {
     try { localStorage.setItem(storeKey(id), JSON.stringify(data)); } catch (e) {}
+  }
+  // Sammelt die {id, token}-Paare aller Partien, an denen DIESER Browser beteiligt
+  // ist (Token liegen nur lokal). Dient dem serverseitigen Eigentumsnachweis für
+  // den "Meine Partien"-Umschalter – statt einer ungeschützten cid-Abfrage.
+  function collectIdentities() {
+    var items = [];
+    try {
+      for (var i = 0; i < localStorage.length; i++) {
+        var k = localStorage.key(i);
+        if (!k || k.indexOf('chessduell_') !== 0) { continue; }
+        var id = k.slice('chessduell_'.length);
+        if (!/^[a-f0-9]+$/.test(id)) { continue; } // nur Spiel-IDs (Hex), keine Settings-Keys
+        var data = loadIdentity(id);
+        if (data && data.token) { items.push({ id: id, token: data.token }); }
+      }
+    } catch (e) {}
+    return items;
   }
   function loadName() {
     try { return localStorage.getItem('chessduell_name') || ''; } catch (e) { return ''; }
@@ -104,11 +127,11 @@
 
   // Schachuhr-Voreinstellungen (Basiszeit Minuten + Inkrement Sekunden je Zug).
   var CLOCK_PRESETS = [
-    { label: 'Ohne Uhr', base: 0, inc: 0 },
-    { label: '5 Minuten', base: 5, inc: 0 },
-    { label: '10 Minuten', base: 10, inc: 0 },
-    { label: '15 Min + 10 Sek/Zug', base: 15, inc: 10 },
-    { label: '30 Minuten', base: 30, inc: 0 }
+    { label: __('No clock', 'human2human-chess-duell'), base: 0, inc: 0 },
+    { label: __('5 minutes', 'human2human-chess-duell'), base: 5, inc: 0 },
+    { label: __('10 minutes', 'human2human-chess-duell'), base: 10, inc: 0 },
+    { label: __('15 min + 10 sec/move', 'human2human-chess-duell'), base: 15, inc: 10 },
+    { label: __('30 minutes', 'human2human-chess-duell'), base: 30, inc: 0 }
   ];
 
   function fmtClock(ms) {
@@ -166,20 +189,20 @@
     var r = this.root;
     r.innerHTML = '';
     var box = el('div', 'cd-lobby');
-    box.appendChild(el('h2', null, 'Schach – Online gegeneinander spielen'));
+    box.appendChild(el('h2', null, __('Chess – play online against each other', 'human2human-chess-duell')));
     box.appendChild(el('p', 'cd-muted',
-      'Starte eine neue Partie und teile den Link mit deinem Gegner. Wer den Link erstellt, spielt Weiß.'));
+      __('Start a new game and share the link with your opponent. Whoever creates the link plays White.', 'human2human-chess-duell')));
 
     var nameInput = el('input', 'cd-name-input');
     nameInput.type = 'text';
     nameInput.maxLength = 24;
-    nameInput.placeholder = 'Dein Name (optional)';
+    nameInput.placeholder = __('Your name (optional)', 'human2human-chess-duell');
     nameInput.value = defaultName();
-    box.appendChild(el('label', 'cd-field-label', 'Dein Name'));
+    box.appendChild(el('label', 'cd-field-label', __('Your name', 'human2human-chess-duell')));
     box.appendChild(nameInput);
 
     // Schachuhr
-    box.appendChild(el('label', 'cd-field-label', 'Schachuhr'));
+    box.appendChild(el('label', 'cd-field-label', __('Chess clock', 'human2human-chess-duell')));
     var clockSelect = el('select', 'cd-select');
     CLOCK_PRESETS.forEach(function (p, i) {
       var opt = el('option', null, p.label);
@@ -187,25 +210,25 @@
       clockSelect.appendChild(opt);
     });
     box.appendChild(clockSelect);
-    box.appendChild(el('div', 'cd-hint', 'Es zählt nur die Online-Zeit des Spielers am Zug. Ist jemand offline, pausiert seine Uhr.'));
+    box.appendChild(el('div', 'cd-hint', __('Only the online time of the player to move counts. If someone is offline, their clock pauses.', 'human2human-chess-duell')));
 
     // E-Mail-Benachrichtigung
-    box.appendChild(el('label', 'cd-field-label', 'E-Mail für Zug-Benachrichtigung (optional)'));
+    box.appendChild(el('label', 'cd-field-label', __('Email for move notification (optional)', 'human2human-chess-duell')));
     var emailInput = el('input', 'cd-name-input');
     emailInput.type = 'email';
     emailInput.maxLength = 100;
-    emailInput.placeholder = 'name@beispiel.de';
+    emailInput.placeholder = __('name@example.com', 'human2human-chess-duell');
     emailInput.value = defaultEmail();
     box.appendChild(emailInput);
     box.appendChild(el('div', 'cd-hint',
-      'Wird nur verwendet, um dich zu benachrichtigen, wenn du am Zug bist, und mit dem Spielende automatisch gelöscht – nicht dauerhaft gespeichert. Hinweis: Wie jede Eingabe ist die Adresse technisch im Server-Log sichtbar.'));
+      __('Only used to notify you when it is your turn, and deleted automatically when the game ends – not stored permanently. Note: like any input, the address is technically visible in the server log.', 'human2human-chess-duell')));
 
-    var btn = el('button', 'cd-btn cd-btn-primary', 'Neue Partie starten');
+    var btn = el('button', 'cd-btn cd-btn-primary', __('Start new game', 'human2human-chess-duell'));
     var msg = el('div', 'cd-msg');
     var self = this;
     btn.addEventListener('click', function () {
       btn.disabled = true;
-      msg.textContent = 'Erstelle Partie ...';
+      msg.textContent = __('Creating game ...', 'human2human-chess-duell');
       var nm = nameInput.value.trim();
       var em = emailInput.value.trim();
       var preset = CLOCK_PRESETS[parseInt(clockSelect.value, 10)] || CLOCK_PRESETS[0];
@@ -221,7 +244,7 @@
         self.enterGame(data.id);
       }).catch(function (e) {
         btn.disabled = false;
-        msg.textContent = 'Fehler: ' + e.message;
+        msg.textContent = fmt(__('Error: %s', 'human2human-chess-duell'), e.message);
       });
     });
     box.appendChild(btn);
@@ -253,16 +276,16 @@
     var container = this.myGamesEl;
     if (!container) { return; }
     var self = this;
-    api(withParams('mygames', { cid: getCid() })).then(function (list) {
+    api('mygames', 'POST', { items: collectIdentities() }).then(function (list) {
       container.innerHTML = '';
       if (!list || !list.length) { container.style.display = 'none'; return; }
       container.style.display = '';
-      container.appendChild(el('div', 'cd-mygames-title', 'Meine Partien'));
+      container.appendChild(el('div', 'cd-mygames-title', __('My games', 'human2human-chess-duell')));
       var listEl = el('div', 'cd-mygames-list');
       list.forEach(function (g) {
-        var statusTxt = g.status === 'finished' ? 'beendet'
-          : (!g.has_black ? 'wartet auf Gegner' : (g.your_turn ? 'du bist am Zug' : 'Gegner am Zug'));
-        var vs = g.opponent ? ('vs ' + g.opponent) : 'neue Partie';
+        var statusTxt = g.status === 'finished' ? __('finished', 'human2human-chess-duell')
+          : (!g.has_black ? __('waiting for opponent', 'human2human-chess-duell') : (g.your_turn ? __('your turn', 'human2human-chess-duell') : __('opponent to move', 'human2human-chess-duell')));
+        var vs = g.opponent ? fmt(__('vs %s', 'human2human-chess-duell'), g.opponent) : __('new game', 'human2human-chess-duell');
         var cls = 'cd-mygames-item' + (g.id === self.gameId ? ' cd-current' : '') + (g.your_turn ? ' cd-turnflag' : '');
         var item = el('button', cls, (g.color === 'white' ? '♔ ' : '♚ ') + vs + ' — ' + statusTxt);
         item.addEventListener('click', function () { self.switchGame(g.id); });
@@ -297,7 +320,7 @@
     log.innerHTML = '';
     msgs.forEach(function (m) {
       var row = el('div', 'cd-chat-msg' + (m.color === myCode ? ' cd-mine' : ''));
-      row.appendChild(el('span', 'cd-chat-name', (m.name || (m.color === 'w' ? 'Weiß' : 'Schwarz')) + ': '));
+      row.appendChild(el('span', 'cd-chat-name', (m.name || (m.color === 'w' ? __('White', 'human2human-chess-duell') : __('Black', 'human2human-chess-duell'))) + ': '));
       row.appendChild(el('span', 'cd-chat-body', m.text)); // textContent -> kein HTML-Injection
       log.appendChild(row);
     });
@@ -325,7 +348,7 @@
     // Nur eine ausdrücklich gesetzte Adresse senden (Opt-in), nicht die reine Vorbelegung.
     var myEmail = loadEmail();
     if (myEmail) { body.email = myEmail; }
-    this.root.innerHTML = '<div class="cd-msg">Verbinde mit Partie ...</div>';
+    this.root.innerHTML = '<div class="cd-msg">' + __('Connecting to game ...', 'human2human-chess-duell') + '</div>';
     api('game/' + id + '/join', 'POST', body).then(function (data) {
       self.color = data.color;
       self.token = data.token || (ident && ident.token) || null;
@@ -335,9 +358,9 @@
       self.startPolling();
     }).catch(function (e) {
       self.root.innerHTML = '';
-      var m = el('div', 'cd-msg', 'Partie konnte nicht geladen werden: ' + e.message);
+      var m = el('div', 'cd-msg', fmt(__('Could not load game: %s', 'human2human-chess-duell'), e.message));
       self.root.appendChild(m);
-      var back = el('button', 'cd-btn', 'Zurück zur Lobby');
+      var back = el('button', 'cd-btn', __('Back to lobby', 'human2human-chess-duell'));
       back.addEventListener('click', function () {
         history.replaceState(null, '', window.location.pathname);
         self.renderLobby();
@@ -390,7 +413,7 @@
     var topRow = el('div', 'cd-side-top');
 
     var movesCol = el('div', 'cd-moves-col');
-    movesCol.appendChild(el('h3', null, 'Zugliste'));
+    movesCol.appendChild(el('h3', null, __('Move list', 'human2human-chess-duell')));
     this.moveListEl = el('div', 'cd-moves');
     movesCol.appendChild(this.moveListEl);
     topRow.appendChild(movesCol);
@@ -399,15 +422,15 @@
     this.chatLogEl = null;
     if (this.color === 'white' || this.color === 'black') {
       var chatWrap = el('div', 'cd-chat');
-      chatWrap.appendChild(el('h3', null, 'Chat'));
+      chatWrap.appendChild(el('h3', null, __('Chat', 'human2human-chess-duell')));
       this.chatLogEl = el('div', 'cd-chat-log');
       chatWrap.appendChild(this.chatLogEl);
       var chatRow = el('div', 'cd-chat-input');
       var chatInput = el('input', 'cd-chat-text');
       chatInput.type = 'text';
       chatInput.maxLength = 500;
-      chatInput.placeholder = 'Nachricht …';
-      var chatSend = el('button', 'cd-btn', 'Senden');
+      chatInput.placeholder = __('Message …', 'human2human-chess-duell');
+      var chatSend = el('button', 'cd-btn', __('Send', 'human2human-chess-duell'));
       var doSend = function () {
         var v = chatInput.value.trim();
         if (v) { self.sendChat(v); chatInput.value = ''; }
@@ -439,34 +462,35 @@
       self.drawBoard();
     });
     optWrap.appendChild(optCb);
-    optWrap.appendChild(el('span', null, 'Figuren-Namen anzeigen (beim Überfahren mit der Maus)'));
+    optWrap.appendChild(el('span', null, __('Show piece names (on mouse hover)', 'human2human-chess-duell')));
     controls.appendChild(optWrap);
 
     if (this.color === 'white' || this.color === 'black') {
       // Auf anderem Gerät weiterspielen: Link mit eigener Identität (Token) erzeugen.
       var contWrap = el('div', 'cd-continue');
-      var contBtn = el('button', 'cd-btn', 'Auf anderem Gerät weiterspielen');
+      var contBtn = el('button', 'cd-btn', __('Continue on another device', 'human2human-chess-duell'));
       contWrap.appendChild(contBtn);
       var contBox = el('div', 'cd-continue-box cd-hidden');
       contBox.appendChild(el('div', 'cd-muted',
-        'Öffne diesen Link auf deinem anderen Gerät (z. B. Handy), um als '
-        + (this.color === 'white' ? 'Weiß' : 'Schwarz') + ' weiterzuspielen:'));
+        this.color === 'white'
+          ? __('Open this link on your other device (e.g. phone) to continue playing as White:', 'human2human-chess-duell')
+          : __('Open this link on your other device (e.g. phone) to continue playing as Black:', 'human2human-chess-duell')));
       var contInput = el('input', 'cd-link');
       contInput.type = 'text';
       contInput.readOnly = true;
       contInput.addEventListener('focus', function () { this.select(); });
       contBox.appendChild(contInput);
-      var contCopy = el('button', 'cd-btn', 'Link kopieren');
+      var contCopy = el('button', 'cd-btn', __('Copy link', 'human2human-chess-duell'));
       contCopy.addEventListener('click', function () {
         contInput.select();
         if (navigator.clipboard) { navigator.clipboard.writeText(contInput.value); }
         else { document.execCommand('copy'); }
-        contCopy.textContent = 'Kopiert!';
-        setTimeout(function () { contCopy.textContent = 'Link kopieren'; }, 1500);
+        contCopy.textContent = __('Copied!', 'human2human-chess-duell');
+        setTimeout(function () { contCopy.textContent = __('Copy link', 'human2human-chess-duell'); }, 1500);
       });
       contBox.appendChild(contCopy);
       contBox.appendChild(el('div', 'cd-hint',
-        'Wichtig: Wer diesen Link hat, kann an deiner Stelle spielen. Schick ihn nur dir selbst.'));
+        __('Important: anyone with this link can play as you. Only send it to yourself.', 'human2human-chess-duell')));
       contWrap.appendChild(contBox);
       contBtn.addEventListener('click', function () {
         contInput.value = self.continueUrl();
@@ -476,11 +500,11 @@
       controls.appendChild(contWrap);
 
       var nameWrap = el('div', 'cd-name-edit');
-      nameWrap.appendChild(el('label', 'cd-name-label', 'Dein Name'));
+      nameWrap.appendChild(el('label', 'cd-name-label', __('Your name', 'human2human-chess-duell')));
       var nameField = el('input', 'cd-name-input');
       nameField.type = 'text';
       nameField.maxLength = 24;
-      nameField.placeholder = this.color === 'white' ? 'Weiß' : 'Schwarz';
+      nameField.placeholder = this.color === 'white' ? __('White', 'human2human-chess-duell') : __('Black', 'human2human-chess-duell');
       var ownName = this.color === 'white'
         ? (this.state && this.state.white_name)
         : (this.state && this.state.black_name);
@@ -490,23 +514,23 @@
       controls.appendChild(nameWrap);
 
       var emailWrap = el('div', 'cd-name-edit');
-      emailWrap.appendChild(el('label', 'cd-name-label', 'E-Mail-Benachrichtigung'));
+      emailWrap.appendChild(el('label', 'cd-name-label', __('Email notification', 'human2human-chess-duell')));
       var emailField = el('input', 'cd-name-input');
       emailField.type = 'email';
       emailField.maxLength = 100;
-      emailField.placeholder = 'name@beispiel.de';
+      emailField.placeholder = __('name@example.com', 'human2human-chess-duell');
       emailField.value = defaultEmail();
       emailField.addEventListener('change', function () { self.saveOwnEmail(this.value); });
       emailWrap.appendChild(emailField);
       emailWrap.appendChild(el('div', 'cd-hint',
-        'Benachrichtigung, wenn du am Zug bist. Adresse wird mit Spielende gelöscht, nicht dauerhaft gespeichert (im Server-Log sichtbar). Feld leeren = aus.'));
+        __('Notification when it is your turn. The address is deleted when the game ends, not stored permanently (visible in the server log). Empty field = off.', 'human2human-chess-duell')));
       controls.appendChild(emailWrap);
 
-      this.resignBtn = el('button', 'cd-btn cd-btn-danger', 'Aufgeben');
+      this.resignBtn = el('button', 'cd-btn cd-btn-danger', __('Resign', 'human2human-chess-duell'));
       this.resignBtn.addEventListener('click', function () { self.resign(); });
       controls.appendChild(this.resignBtn);
     }
-    var newBtn = el('button', 'cd-btn', 'Neue Partie');
+    var newBtn = el('button', 'cd-btn', __('New game', 'human2human-chess-duell'));
     newBtn.addEventListener('click', function () {
       history.replaceState(null, '', window.location.pathname);
       self.stopPolling();
@@ -546,27 +570,27 @@
   ChessDuell.prototype.updateShare = function () {
     var box = this.shareBox; box.innerHTML = '';
     if (this.state && this.state.has_black) {
-      box.appendChild(el('div', 'cd-muted', 'Beide Spieler sind verbunden.'));
+      box.appendChild(el('div', 'cd-muted', __('Both players are connected.', 'human2human-chess-duell')));
       return;
     }
     if (this.color === 'white') {
-      box.appendChild(el('div', 'cd-muted', 'Teile diesen Link mit deinem Gegner:'));
+      box.appendChild(el('div', 'cd-muted', __('Share this link with your opponent:', 'human2human-chess-duell')));
       var url = this.gameUrl(this.gameId);
       var input = el('input', 'cd-link');
       input.type = 'text'; input.readOnly = true; input.value = url;
       input.addEventListener('focus', function () { this.select(); });
       box.appendChild(input);
-      var copy = el('button', 'cd-btn', 'Link kopieren');
+      var copy = el('button', 'cd-btn', __('Copy link', 'human2human-chess-duell'));
       copy.addEventListener('click', function () {
         input.select();
         if (navigator.clipboard) { navigator.clipboard.writeText(url); }
         else { document.execCommand('copy'); }
-        copy.textContent = 'Kopiert!';
-        setTimeout(function () { copy.textContent = 'Link kopieren'; }, 1500);
+        copy.textContent = __('Copied!', 'human2human-chess-duell');
+        setTimeout(function () { copy.textContent = __('Copy link', 'human2human-chess-duell'); }, 1500);
       });
       box.appendChild(copy);
     } else if (this.color === 'spectator') {
-      box.appendChild(el('div', 'cd-muted', 'Du schaust als Zuschauer zu.'));
+      box.appendChild(el('div', 'cd-muted', __('You are watching as a spectator.', 'human2human-chess-duell')));
     }
   };
 
@@ -605,7 +629,7 @@
           var pe = el('span', 'cd-piece cd-' + (piece[0] === 'w' ? 'white' : 'black'), GLYPH[piece[1]]);
           cell.appendChild(pe);
           if (this.showPieceNames) {
-            cell.title = PIECE_NAME[piece[1]] + ' (' + (piece[0] === 'w' ? 'Weiß' : 'Schwarz') + ')';
+            cell.title = PIECE_NAME[piece[1]] + ' (' + (piece[0] === 'w' ? __('White', 'human2human-chess-duell') : __('Black', 'human2human-chess-duell')) + ')';
           }
         }
         if (square === lastFrom || square === lastTo) { cell.classList.add('cd-last'); }
@@ -660,7 +684,7 @@
     var p = this.promoEl;
     p.innerHTML = '';
     p.classList.remove('cd-hidden');
-    p.appendChild(el('div', 'cd-promo-title', 'Umwandeln in:'));
+    p.appendChild(el('div', 'cd-promo-title', __('Promote to:', 'human2human-chess-duell')));
     var self = this;
     ['q', 'r', 'b', 'n'].forEach(function (t) {
       var btn = el('button', 'cd-promo-btn cd-' + (self.color === 'white' ? 'white' : 'black'),
@@ -710,7 +734,7 @@
     }).catch(function (e) {
       // Konflikt / serverseitig abgelehnt: maßgeblichen Zustand neu laden
       self.fetchState();
-      console.warn('Zug abgelehnt:', e.message);
+      console.warn('Move rejected:', e.message);
     });
   };
 
@@ -758,8 +782,8 @@
     var cs = this.clockState;
     if (!cs || !cs.enabled) { c.innerHTML = ''; c.style.display = 'none'; return; }
     c.style.display = '';
-    var wName = (this.state && this.state.white_name) ? this.state.white_name : 'Weiß';
-    var bName = (this.state && this.state.black_name) ? this.state.black_name : 'Schwarz';
+    var wName = (this.state && this.state.white_name) ? this.state.white_name : __('White', 'human2human-chess-duell');
+    var bName = (this.state && this.state.black_name) ? this.state.black_name : __('Black', 'human2human-chess-duell');
     var wMs = this.liveClock('w');
     var bMs = this.liveClock('b');
 
@@ -782,7 +806,7 @@
   };
 
   ChessDuell.prototype.resign = function () {
-    if (!confirm('Partie wirklich aufgeben?')) { return; }
+    if (!confirm(__('Really resign this game?', 'human2human-chess-duell'))) { return; }
     var self = this;
     var result = this.color === 'white' ? '0-1' : '1-0';
     api('game/' + this.gameId + '/resign', 'POST', { token: this.token }).then(function (data) {
@@ -795,12 +819,12 @@
   ChessDuell.prototype.updateStatus = function () {
     var s = this.statusBar; if (!s) { return; }
     var st = this.engine.gameStatus();
-    var wName = (this.state && this.state.white_name) ? this.state.white_name : 'Weiß';
+    var wName = (this.state && this.state.white_name) ? this.state.white_name : __('White', 'human2human-chess-duell');
     var bName = (this.state && this.state.black_name) ? this.state.black_name
-              : ((this.state && this.state.has_black) ? 'Schwarz' : '—');
+              : ((this.state && this.state.has_black) ? __('Black', 'human2human-chess-duell') : '—');
 
-    var youAre = this.color === 'white' ? 'Du spielst Weiß' :
-                 this.color === 'black' ? 'Du spielst Schwarz' : 'Zuschauer';
+    var youAre = this.color === 'white' ? __('You play White', 'human2human-chess-duell') :
+                 this.color === 'black' ? __('You play Black', 'human2human-chess-duell') : __('Spectator', 'human2human-chess-duell');
     var line2 = '';
     var cls = 'cd-status';
 
@@ -809,28 +833,28 @@
       var rt = this.state.result_type;
       var winner = res === '1-0' ? wName : (res === '0-1' ? bName : null);
       if (res === '1/2-1/2') {
-        line2 = 'Remis' + (rt === 'stalemate' ? ' (Patt)' : rt === 'fiftymove' ? ' (50-Züge-Regel)'
-              : rt === 'material' ? ' (unzureichendes Material)' : '');
+        line2 = __('Draw', 'human2human-chess-duell') + (rt === 'stalemate' ? __(' (stalemate)', 'human2human-chess-duell') : rt === 'fiftymove' ? __(' (fifty-move rule)', 'human2human-chess-duell')
+              : rt === 'material' ? __(' (insufficient material)', 'human2human-chess-duell') : '');
       } else if (winner) {
-        var how = rt === 'timeout' ? ' (Zeit abgelaufen)' : rt === 'resign' ? ' (Aufgabe)'
-                : rt === 'checkmate' ? ' (Schachmatt)' : '';
-        line2 = 'Sieg – ' + winner + ' gewinnt' + how;
+        var how = rt === 'timeout' ? __(' (time forfeit)', 'human2human-chess-duell') : rt === 'resign' ? __(' (resignation)', 'human2human-chess-duell')
+                : rt === 'checkmate' ? __(' (checkmate)', 'human2human-chess-duell') : '';
+        line2 = fmt(__('Victory – %s wins', 'human2human-chess-duell'), winner) + how;
       } else {
-        line2 = 'Partie beendet';
+        line2 = __('Game over', 'human2human-chess-duell');
       }
       cls += ' cd-status-over';
     } else if (st.over) {
-      if (st.type === 'checkmate') { line2 = 'Schachmatt – ' + (st.winner === 'w' ? wName : bName) + ' gewinnt'; }
-      else if (st.type === 'stalemate') { line2 = 'Patt – Remis'; }
-      else if (st.type === 'fiftymove') { line2 = '50-Züge-Regel – Remis'; }
-      else { line2 = 'Remis (unzureichendes Material)'; }
+      if (st.type === 'checkmate') { line2 = fmt(__('Checkmate – %s wins', 'human2human-chess-duell'), st.winner === 'w' ? wName : bName); }
+      else if (st.type === 'stalemate') { line2 = __('Stalemate – draw', 'human2human-chess-duell'); }
+      else if (st.type === 'fiftymove') { line2 = __('Fifty-move rule – draw', 'human2human-chess-duell'); }
+      else { line2 = __('Draw (insufficient material)', 'human2human-chess-duell'); }
       cls += ' cd-status-over';
     } else if (!this.state || !this.state.has_black) {
-      line2 = 'Warte auf den Gegner ...';
+      line2 = __('Waiting for the opponent ...', 'human2human-chess-duell');
     } else {
       var turnName = this.engine.turn === 'w' ? wName : bName;
-      line2 = 'Am Zug: ' + turnName + (this.myTurn() ? ' (du)' : '');
-      if (st.check) { line2 += ' – Schach!'; }
+      line2 = fmt(__('To move: %s', 'human2human-chess-duell'), turnName) + (this.myTurn() ? __(' (you)', 'human2human-chess-duell') : '');
+      if (st.check) { line2 += __(' – check!', 'human2human-chess-duell'); }
     }
     s.className = cls;
     s.innerHTML = '';

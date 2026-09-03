@@ -1,0 +1,364 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: Human2Human Chess Duell 1.11.0\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"PO-Revision-Date: 2026-07-15 12:00+0200\n"
+"Language: de_DE_formal\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"X-Domain: human2human-chess-duell\n"
+
+msgid "Black"
+msgstr "Schwarz"
+
+msgid "White"
+msgstr "Weiß"
+
+msgid "Last move: %s"
+msgstr "Zuletzt gezogen: %s"
+
+msgid "Chess: It's your turn"
+msgstr "Schach: Du bist am Zug"
+
+msgid "There are already %d games in progress. Please try again later."
+msgstr "Es laufen bereits %d Partien gleichzeitig. Bitte später erneut versuchen."
+
+msgid "Random number generator not available."
+msgstr "Zufallsgenerator nicht verfügbar."
+
+msgid "Game not found or expired."
+msgstr "Partie nicht gefunden oder abgelaufen."
+
+msgid "This game is already finished."
+msgstr "Die Partie ist bereits beendet."
+
+msgid "Invalid player token."
+msgstr "Kein gültiges Spieler-Token."
+
+msgid "No opponent has joined yet."
+msgstr "Es ist noch kein Gegner verbunden."
+
+msgid "It is not your turn."
+msgstr "Du bist nicht am Zug."
+
+msgid "Invalid squares."
+msgstr "Ungültige Felder."
+
+msgid "Inconsistent position."
+msgstr "Stellung inkonsistent."
+
+msgid "Illegal move."
+msgstr "Ungültiger Zug."
+
+msgid "Empty message."
+msgstr "Leere Nachricht."
+
+msgid "Game deleted."
+msgstr "Partie gelöscht."
+
+msgid "%d finished game(s) removed."
+msgstr "%d beendete Partie(n) entfernt."
+
+msgid "Human2Human Chess Duell – Settings"
+msgstr "Human2Human Chess Duell – Einstellungen"
+
+msgid "Maximum simultaneous games"
+msgstr "Maximale gleichzeitige Partien"
+
+msgid "How many games may be in progress at the same time (1–200). Finished games do not count."
+msgstr "Wie viele laufende Partien gleichzeitig erlaubt sind (1–200). Beendete Partien zählen nicht mit."
+
+msgid "Logged-in users"
+msgstr "Angemeldete Nutzer"
+
+msgid "Logged-in WordPress users may bypass the limit of simultaneous games"
+msgstr "Angemeldete WordPress-Nutzer dürfen das Limit gleichzeitiger Partien übergehen"
+
+msgid "If disabled, the limit above applies to everyone – including logged-in users."
+msgstr "Wenn deaktiviert, gilt das Limit oben für alle – auch für angemeldete Nutzer."
+
+msgid "Lifetime until automatic removal (days)"
+msgstr "Laufzeit bis Auto-Ende (Tage)"
+
+msgid "After this many days without activity a game is removed automatically (1–365). Otherwise a game only ends by checkmate, resignation or draw."
+msgstr "Nach so vielen Tagen ohne Aktivität wird eine Partie automatisch entfernt (1–365). Ansonsten endet eine Partie nur durch Matt, Aufgabe oder Remis."
+
+msgid "Games in progress"
+msgstr "Laufende Partien"
+
+msgid "%1$s game(s) in progress, %2$s stored in total."
+msgstr "%1$s laufende Partie(n), %2$s gespeichert insgesamt."
+
+msgid "No games are currently stored."
+msgstr "Aktuell sind keine Partien gespeichert."
+
+msgid "Waiting for opponent"
+msgstr "Wartet auf Gegner"
+
+msgid "In progress"
+msgstr "Läuft"
+
+msgid "Finished"
+msgstr "Beendet"
+
+msgid "Status"
+msgstr "Status"
+
+msgid "Moves"
+msgstr "Züge"
+
+msgid "To move"
+msgstr "Am Zug"
+
+msgid "Clock"
+msgstr "Uhr"
+
+msgid "Last activity"
+msgstr "Letzte Aktivität"
+
+msgid "Action"
+msgstr "Aktion"
+
+msgid "%d min"
+msgstr "%d Min"
+
+msgid "+%d sec"
+msgstr "+%d Sek"
+
+msgid "%s ago"
+msgstr "%s her"
+
+msgid "Really delete this game?"
+msgstr "Diese Partie wirklich löschen?"
+
+msgid "Delete"
+msgstr "Löschen"
+
+msgid "Remove all finished games?"
+msgstr "Alle beendeten Partien entfernen?"
+
+msgid "Remove all finished games"
+msgstr "Alle beendeten Partien entfernen"
+
+msgid "Hello,\n\n%1$s has moved – it's your turn now.\n\n%2$sGo to the game:\n%3$s\n\nNote: Your address is only used for notifications about this game and is deleted automatically when the game ends. It is not stored permanently."
+msgstr "Hallo,\n\n%1$s hat gezogen – du bist jetzt am Zug.\n\n%2$sZur Partie:\n%3$s\n\nHinweis: Deine Adresse wird nur für Benachrichtigungen dieser Partie verwendet und mit dem Spielende automatisch gelöscht. Sie wird nicht dauerhaft gespeichert."
+
+msgid "King"
+msgstr "König"
+
+msgid "Queen"
+msgstr "Dame"
+
+msgid "Rook"
+msgstr "Turm"
+
+msgid "Bishop"
+msgstr "Läufer"
+
+msgid "Knight"
+msgstr "Springer"
+
+msgid "Pawn"
+msgstr "Bauer"
+
+msgid "No clock"
+msgstr "Ohne Uhr"
+
+msgid "5 minutes"
+msgstr "5 Minuten"
+
+msgid "10 minutes"
+msgstr "10 Minuten"
+
+msgid "15 min + 10 sec/move"
+msgstr "15 Min + 10 Sek/Zug"
+
+msgid "30 minutes"
+msgstr "30 Minuten"
+
+msgid "Chess – play online against each other"
+msgstr "Schach – Online gegeneinander spielen"
+
+msgid "Start a new game and share the link with your opponent. Whoever creates the link plays White."
+msgstr "Starte eine neue Partie und teile den Link mit deinem Gegner. Wer den Link erstellt, spielt Weiß."
+
+msgid "Your name (optional)"
+msgstr "Dein Name (optional)"
+
+msgid "Your name"
+msgstr "Dein Name"
+
+msgid "Chess clock"
+msgstr "Schachuhr"
+
+msgid "Only the online time of the player to move counts. If someone is offline, their clock pauses."
+msgstr "Es zählt nur die Online-Zeit des Spielers am Zug. Ist jemand offline, pausiert seine Uhr."
+
+msgid "Email for move notification (optional)"
+msgstr "E-Mail für Zug-Benachrichtigung (optional)"
+
+msgid "name@example.com"
+msgstr "name@beispiel.de"
+
+msgid "Only used to notify you when it is your turn, and deleted automatically when the game ends – not stored permanently. Note: like any input, the address is technically visible in the server log."
+msgstr "Wird nur verwendet, um dich zu benachrichtigen, wenn du am Zug bist, und mit dem Spielende automatisch gelöscht – nicht dauerhaft gespeichert. Hinweis: Wie jede Eingabe ist die Adresse technisch im Server-Log sichtbar."
+
+msgid "Start new game"
+msgstr "Neue Partie starten"
+
+msgid "Creating game ..."
+msgstr "Erstelle Partie ..."
+
+msgid "Error: %s"
+msgstr "Fehler: %s"
+
+msgid "My games"
+msgstr "Meine Partien"
+
+msgid "finished"
+msgstr "beendet"
+
+msgid "waiting for opponent"
+msgstr "wartet auf Gegner"
+
+msgid "your turn"
+msgstr "du bist am Zug"
+
+msgid "opponent to move"
+msgstr "Gegner am Zug"
+
+msgid "vs %s"
+msgstr "vs %s"
+
+msgid "new game"
+msgstr "neue Partie"
+
+msgid "Connecting to game ..."
+msgstr "Verbinde mit Partie ..."
+
+msgid "Could not load game: %s"
+msgstr "Partie konnte nicht geladen werden: %s"
+
+msgid "Back to lobby"
+msgstr "Zurück zur Lobby"
+
+msgid "Move list"
+msgstr "Zugliste"
+
+msgid "Chat"
+msgstr "Chat"
+
+msgid "Message …"
+msgstr "Nachricht …"
+
+msgid "Send"
+msgstr "Senden"
+
+msgid "Show piece names (on mouse hover)"
+msgstr "Figuren-Namen anzeigen (beim Überfahren mit der Maus)"
+
+msgid "Continue on another device"
+msgstr "Auf anderem Gerät weiterspielen"
+
+msgid "Open this link on your other device (e.g. phone) to continue playing as White:"
+msgstr "Öffne diesen Link auf deinem anderen Gerät (z. B. Handy), um als Weiß weiterzuspielen:"
+
+msgid "Open this link on your other device (e.g. phone) to continue playing as Black:"
+msgstr "Öffne diesen Link auf deinem anderen Gerät (z. B. Handy), um als Schwarz weiterzuspielen:"
+
+msgid "Copy link"
+msgstr "Link kopieren"
+
+msgid "Copied!"
+msgstr "Kopiert!"
+
+msgid "Important: anyone with this link can play as you. Only send it to yourself."
+msgstr "Wichtig: Wer diesen Link hat, kann an deiner Stelle spielen. Schick ihn nur dir selbst."
+
+msgid "Email notification"
+msgstr "E-Mail-Benachrichtigung"
+
+msgid "Notification when it is your turn. The address is deleted when the game ends, not stored permanently (visible in the server log). Empty field = off."
+msgstr "Benachrichtigung, wenn du am Zug bist. Adresse wird mit Spielende gelöscht, nicht dauerhaft gespeichert (im Server-Log sichtbar). Feld leeren = aus."
+
+msgid "Resign"
+msgstr "Aufgeben"
+
+msgid "New game"
+msgstr "Neue Partie"
+
+msgid "Both players are connected."
+msgstr "Beide Spieler sind verbunden."
+
+msgid "Share this link with your opponent:"
+msgstr "Teile diesen Link mit deinem Gegner:"
+
+msgid "You are watching as a spectator."
+msgstr "Du schaust als Zuschauer zu."
+
+msgid "Promote to:"
+msgstr "Umwandeln in:"
+
+msgid "Really resign this game?"
+msgstr "Partie wirklich aufgeben?"
+
+msgid "You play White"
+msgstr "Du spielst Weiß"
+
+msgid "You play Black"
+msgstr "Du spielst Schwarz"
+
+msgid "Spectator"
+msgstr "Zuschauer"
+
+msgid "Draw"
+msgstr "Remis"
+
+msgid " (stalemate)"
+msgstr " (Patt)"
+
+msgid " (fifty-move rule)"
+msgstr " (50-Züge-Regel)"
+
+msgid " (insufficient material)"
+msgstr " (unzureichendes Material)"
+
+msgid " (time forfeit)"
+msgstr " (Zeit abgelaufen)"
+
+msgid " (resignation)"
+msgstr " (Aufgabe)"
+
+msgid " (checkmate)"
+msgstr " (Schachmatt)"
+
+msgid "Victory – %s wins"
+msgstr "Sieg – %s gewinnt"
+
+msgid "Game over"
+msgstr "Partie beendet"
+
+msgid "Checkmate – %s wins"
+msgstr "Schachmatt – %s gewinnt"
+
+msgid "Stalemate – draw"
+msgstr "Patt – Remis"
+
+msgid "Fifty-move rule – draw"
+msgstr "50-Züge-Regel – Remis"
+
+msgid "Draw (insufficient material)"
+msgstr "Remis (unzureichendes Material)"
+
+msgid "Waiting for the opponent ..."
+msgstr "Warte auf den Gegner ..."
+
+msgid "To move: %s"
+msgstr "Am Zug: %s"
+
+msgid " (you)"
+msgstr " (du)"
+
+msgid " – check!"
+msgstr " – Schach!"

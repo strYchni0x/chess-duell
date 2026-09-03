@@ -1,0 +1,363 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: Human2Human Chess Duell 1.11.0\n"
+"Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/human2human-chess-duell\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"POT-Creation-Date: 2026-07-15 12:00+0200\n"
+"X-Domain: human2human-chess-duell\n"
+
+msgid "Black"
+msgstr ""
+
+msgid "White"
+msgstr ""
+
+msgid "Last move: %s"
+msgstr ""
+
+msgid "Chess: It's your turn"
+msgstr ""
+
+msgid "There are already %d games in progress. Please try again later."
+msgstr ""
+
+msgid "Random number generator not available."
+msgstr ""
+
+msgid "Game not found or expired."
+msgstr ""
+
+msgid "This game is already finished."
+msgstr ""
+
+msgid "Invalid player token."
+msgstr ""
+
+msgid "No opponent has joined yet."
+msgstr ""
+
+msgid "It is not your turn."
+msgstr ""
+
+msgid "Invalid squares."
+msgstr ""
+
+msgid "Inconsistent position."
+msgstr ""
+
+msgid "Illegal move."
+msgstr ""
+
+msgid "Empty message."
+msgstr ""
+
+msgid "Game deleted."
+msgstr ""
+
+msgid "%d finished game(s) removed."
+msgstr ""
+
+msgid "Human2Human Chess Duell – Settings"
+msgstr ""
+
+msgid "Maximum simultaneous games"
+msgstr ""
+
+msgid "How many games may be in progress at the same time (1–200). Finished games do not count."
+msgstr ""
+
+msgid "Logged-in users"
+msgstr ""
+
+msgid "Logged-in WordPress users may bypass the limit of simultaneous games"
+msgstr ""
+
+msgid "If disabled, the limit above applies to everyone – including logged-in users."
+msgstr ""
+
+msgid "Lifetime until automatic removal (days)"
+msgstr ""
+
+msgid "After this many days without activity a game is removed automatically (1–365). Otherwise a game only ends by checkmate, resignation or draw."
+msgstr ""
+
+msgid "Games in progress"
+msgstr ""
+
+msgid "%1$s game(s) in progress, %2$s stored in total."
+msgstr ""
+
+msgid "No games are currently stored."
+msgstr ""
+
+msgid "Waiting for opponent"
+msgstr ""
+
+msgid "In progress"
+msgstr ""
+
+msgid "Finished"
+msgstr ""
+
+msgid "Status"
+msgstr ""
+
+msgid "Moves"
+msgstr ""
+
+msgid "To move"
+msgstr ""
+
+msgid "Clock"
+msgstr ""
+
+msgid "Last activity"
+msgstr ""
+
+msgid "Action"
+msgstr ""
+
+msgid "%d min"
+msgstr ""
+
+msgid "+%d sec"
+msgstr ""
+
+msgid "%s ago"
+msgstr ""
+
+msgid "Really delete this game?"
+msgstr ""
+
+msgid "Delete"
+msgstr ""
+
+msgid "Remove all finished games?"
+msgstr ""
+
+msgid "Remove all finished games"
+msgstr ""
+
+msgid "Hello,\n\n%1$s has moved – it's your turn now.\n\n%2$sGo to the game:\n%3$s\n\nNote: Your address is only used for notifications about this game and is deleted automatically when the game ends. It is not stored permanently."
+msgstr ""
+
+msgid "King"
+msgstr ""
+
+msgid "Queen"
+msgstr ""
+
+msgid "Rook"
+msgstr ""
+
+msgid "Bishop"
+msgstr ""
+
+msgid "Knight"
+msgstr ""
+
+msgid "Pawn"
+msgstr ""
+
+msgid "No clock"
+msgstr ""
+
+msgid "5 minutes"
+msgstr ""
+
+msgid "10 minutes"
+msgstr ""
+
+msgid "15 min + 10 sec/move"
+msgstr ""
+
+msgid "30 minutes"
+msgstr ""
+
+msgid "Chess – play online against each other"
+msgstr ""
+
+msgid "Start a new game and share the link with your opponent. Whoever creates the link plays White."
+msgstr ""
+
+msgid "Your name (optional)"
+msgstr ""
+
+msgid "Your name"
+msgstr ""
+
+msgid "Chess clock"
+msgstr ""
+
+msgid "Only the online time of the player to move counts. If someone is offline, their clock pauses."
+msgstr ""
+
+msgid "Email for move notification (optional)"
+msgstr ""
+
+msgid "name@example.com"
+msgstr ""
+
+msgid "Only used to notify you when it is your turn, and deleted automatically when the game ends – not stored permanently. Note: like any input, the address is technically visible in the server log."
+msgstr ""
+
+msgid "Start new game"
+msgstr ""
+
+msgid "Creating game ..."
+msgstr ""
+
+msgid "Error: %s"
+msgstr ""
+
+msgid "My games"
+msgstr ""
+
+msgid "finished"
+msgstr ""
+
+msgid "waiting for opponent"
+msgstr ""
+
+msgid "your turn"
+msgstr ""
+
+msgid "opponent to move"
+msgstr ""
+
+msgid "vs %s"
+msgstr ""
+
+msgid "new game"
+msgstr ""
+
+msgid "Connecting to game ..."
+msgstr ""
+
+msgid "Could not load game: %s"
+msgstr ""
+
+msgid "Back to lobby"
+msgstr ""
+
+msgid "Move list"
+msgstr ""
+
+msgid "Chat"
+msgstr ""
+
+msgid "Message …"
+msgstr ""
+
+msgid "Send"
+msgstr ""
+
+msgid "Show piece names (on mouse hover)"
+msgstr ""
+
+msgid "Continue on another device"
+msgstr ""
+
+msgid "Open this link on your other device (e.g. phone) to continue playing as White:"
+msgstr ""
+
+msgid "Open this link on your other device (e.g. phone) to continue playing as Black:"
+msgstr ""
+
+msgid "Copy link"
+msgstr ""
+
+msgid "Copied!"
+msgstr ""
+
+msgid "Important: anyone with this link can play as you. Only send it to yourself."
+msgstr ""
+
+msgid "Email notification"
+msgstr ""
+
+msgid "Notification when it is your turn. The address is deleted when the game ends, not stored permanently (visible in the server log). Empty field = off."
+msgstr ""
+
+msgid "Resign"
+msgstr ""
+
+msgid "New game"
+msgstr ""
+
+msgid "Both players are connected."
+msgstr ""
+
+msgid "Share this link with your opponent:"
+msgstr ""
+
+msgid "You are watching as a spectator."
+msgstr ""
+
+msgid "Promote to:"
+msgstr ""
+
+msgid "Really resign this game?"
+msgstr ""
+
+msgid "You play White"
+msgstr ""
+
+msgid "You play Black"
+msgstr ""
+
+msgid "Spectator"
+msgstr ""
+
+msgid "Draw"
+msgstr ""
+
+msgid " (stalemate)"
+msgstr ""
+
+msgid " (fifty-move rule)"
+msgstr ""
+
+msgid " (insufficient material)"
+msgstr ""
+
+msgid " (time forfeit)"
+msgstr ""
+
+msgid " (resignation)"
+msgstr ""
+
+msgid " (checkmate)"
+msgstr ""
+
+msgid "Victory – %s wins"
+msgstr ""
+
+msgid "Game over"
+msgstr ""
+
+msgid "Checkmate – %s wins"
+msgstr ""
+
+msgid "Stalemate – draw"
+msgstr ""
+
+msgid "Fifty-move rule – draw"
+msgstr ""
+
+msgid "Draw (insufficient material)"
+msgstr ""
+
+msgid "Waiting for the opponent ..."
+msgstr ""
+
+msgid "To move: %s"
+msgstr ""
+
+msgid " (you)"
+msgstr ""
+
+msgid " – check!"
+msgstr ""

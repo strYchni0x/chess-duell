@@ -1,20 +1,21 @@
 <?php
 /**
- * Plugin Name:       Chess Duell
+ * Plugin Name:       Human2Human Chess Duell
  * Plugin URI:        https://github.com/strYchni0x/chess-duell
- * Description:        Zwei Menschen spielen online Schach gegeneinander – Partie einfach per Link teilen. Anzahl gleichzeitiger Partien und Laufzeit im Backend einstellbar. Serverseitige Regelprüfung (kein Cheaten möglich), keine KI. Einbinden mit dem Shortcode [chess_duell].
- * Version:           1.10.0
+ * Description:        Two people play chess online against each other - just share a link. Number of simultaneous games and lifetime configurable in the backend. Server-side rule validation (no cheating possible), no AI. Embed with the shortcode [chess_duell].
+ * Version:           1.11.1
  * Author:            Florian Willnat
  * License:           GPL-2.0-or-later
  * License URI:       https://www.gnu.org/licenses/gpl-2.0.html
- * Text Domain:       chess-duell
+ * Text Domain:       human2human-chess-duell
+ * Domain Path:       /languages
  */
 
 if (!defined('ABSPATH')) {
     exit;
 }
 
-define('CHESS_DUELL_VERSION', '1.10.0');
+define('CHESS_DUELL_VERSION', '1.11.1');
 define('CHESS_DUELL_URL', plugin_dir_url(__FILE__));
 define('CHESS_DUELL_PATH', plugin_dir_path(__FILE__));
 define('CHESS_DUELL_OPTION', 'chess_duell_games');
@@ -33,11 +34,17 @@ define('CHESS_DUELL_START_FEN', 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w K
 
 require_once CHESS_DUELL_PATH . 'includes/class-chess-engine.php';
 
+/* Übersetzungen laden: Quellsprache ist Englisch, Deutsch liegt unter /languages. */
+add_action('init', function () {
+    load_plugin_textdomain('human2human-chess-duell', false, dirname(plugin_basename(__FILE__)) . '/languages');
+});
+
 /* ------------------------------------------------------------------ *
- *  GitHub-Updater
+ *  GitHub-Updater (nur in der GitHub-Distribution dieses Repos)
  *  Meldet Updates aus dem GitHub-Repository im WordPress-Dashboard.
- *  → Bei Umstieg auf wordpress.org diesen Block UND die Datei
- *    includes/class-github-updater.php entfernen (siehe Hinweis dort).
+ *  → In der wordpress.org-Distribution ist dieser Block UND die Datei
+ *    includes/class-github-updater.php nicht enthalten (dort übernimmt
+ *    wordpress.org die Updates).
  * ------------------------------------------------------------------ */
 if (is_admin() || (defined('DOING_CRON') && DOING_CRON)) {
     require_once CHESS_DUELL_PATH . 'includes/class-github-updater.php';
@@ -345,7 +352,18 @@ function chess_duell_clock_public($game) {
 
 /** Link zur Partie (für die Benachrichtigung). */
 function chess_duell_game_link($game) {
-    $base = !empty($game['page']) ? $game['page'] : home_url('/');
+    $home = home_url('/');
+    $base = !empty($game['page']) ? $game['page'] : $home;
+    // Sicherheit: In Benachrichtigungs-Mails nur seiteneigene URLs zulassen. Das
+    // page-Feld wird beim Erstellen einer Partie ungeprüft (nur esc_url_raw)
+    // übernommen; ohne diese Prüfung könnte eine fremde Domain untergeschoben
+    // werden und die Mail (vom vertrauenswürdigen Absender der Seite) zu einer
+    // Phishing-Seite verlinken. Bei fremdem Host auf die Startseite zurückfallen.
+    $base_host = wp_parse_url($base, PHP_URL_HOST);
+    $home_host = wp_parse_url($home, PHP_URL_HOST);
+    if (empty($base_host) || strcasecmp((string) $base_host, (string) $home_host) !== 0) {
+        $base = $home;
+    }
     return add_query_arg('chess_game', rawurlencode($game['id']), $base);
 }
 
@@ -364,8 +382,8 @@ function chess_duell_notify_turn(&$game, $color) {
     $game[$key] = $now;
 
     $oppName = ($color === 'w')
-        ? ($game['black_name'] !== '' ? $game['black_name'] : 'Schwarz')
-        : ($game['white_name'] !== '' ? $game['white_name'] : 'Weiß');
+        ? ($game['black_name'] !== '' ? $game['black_name'] : __( 'Black', 'human2human-chess-duell' ))
+        : ($game['white_name'] !== '' ? $game['white_name'] : __( 'White', 'human2human-chess-duell' ));
     $link    = chess_duell_game_link($game);
 
     // Zuletzt gezogenen Zug (SAN) für die Mail aufbereiten (leer, falls noch kein Zug).
@@ -376,14 +394,14 @@ function chess_duell_notify_turn(&$game, $color) {
         $ply = count($game['moves']);
         $num = (int) ceil($ply / 2);
         $notation = (($ply % 2) === 1) ? ($num . '. ' . $san) : ($num . '… ' . $san);
-        $lastMove = 'Zuletzt gezogen: ' . $notation . "\n\n";
+        /* translators: %s: chess move in algebraic notation */
+        $lastMove = sprintf( __( 'Last move: %s', 'human2human-chess-duell' ), $notation ) . "\n\n";
     }
 
-    $subject = 'Schach: Du bist am Zug';
+    $subject = __( 'Chess: It\'s your turn', 'human2human-chess-duell' );
+    /* translators: 1: opponent name, 2: last-move line (may be empty), 3: link to the game */
     $body    = sprintf(
-        "Hallo,\n\n%s hat gezogen – du bist jetzt am Zug.\n\n%sZur Partie:\n%s\n\n" .
-        "Hinweis: Deine Adresse wird nur für Benachrichtigungen dieser Partie verwendet " .
-        "und mit dem Spielende automatisch gelöscht. Sie wird nicht dauerhaft gespeichert.",
+        __( "Hello,\n\n%1\$s has moved – it's your turn now.\n\n%2\$sGo to the game:\n%3\$s\n\nNote: Your address is only used for notifications about this game and is deleted automatically when the game ends. It is not stored permanently.", 'human2human-chess-duell' ),
         $oppName,
         $lastMove,
         $link
@@ -434,15 +452,19 @@ add_action('rest_api_init', function () {
         'permission_callback' => '__return_true',
     ));
 
+    // Öffentlich erreichbar (Gäste ohne Konto). Der Callback gibt jedoch nur Partien
+    // zurück, deren Eigentum nachgewiesen ist: angemeldeter WP-Nutzer (User-ID,
+    // serverseitig) ODER Kenntnis des geheimen Spiel-Tokens. Daher __return_true.
     register_rest_route($ns, '/mygames', array(
-        'methods'             => 'GET',
+        'methods'             => 'POST',
         'callback'            => 'chess_duell_rest_mygames',
         'permission_callback' => '__return_true',
     ));
 });
 
 /**
- * Liefert die Partien des Anfragenden (über WP-User-ID und/oder Gast-Browser-ID).
+ * Liefert die Partien des Anfragenden – mit Eigentumsnachweis:
+ * angemeldeter WP-Nutzer (User-ID, serverseitig) ODER nachgewiesener Spiel-Token.
  * Gibt keine Tokens zurück – nur Anzeige-Infos für den "Meine Partien"-Umschalter.
  */
 function chess_duell_rest_mygames($req) {
@@ -450,7 +472,19 @@ function chess_duell_rest_mygames($req) {
     chess_duell_save_games($games);
 
     $uid = get_current_user_id();
-    $cid = chess_duell_sanitize_cid((string) $req->get_param('cid'));
+
+    // Eigentumsnachweis für Gäste: der Client schickt die ihm bekannten
+    // {id, token}-Paare. Die geheimen Tokens liegen nur im Browser des jeweiligen
+    // Spielers; eine mitgeschickte cid allein genügt bewusst NICHT mehr.
+    $claims = array();
+    $body = $req->get_json_params();
+    if (is_array($body) && isset($body['items']) && is_array($body['items'])) {
+        foreach ($body['items'] as $it) {
+            if (is_array($it) && isset($it['id'], $it['token'])) {
+                $claims[(string) $it['id']] = (string) $it['token'];
+            }
+        }
+    }
     $out = array();
 
     foreach ($games as $g) {
@@ -459,17 +493,20 @@ function chess_duell_rest_mygames($req) {
             $color = 'white';
         } elseif ($uid > 0 && intval($g['black_user']) === $uid) {
             $color = 'black';
-        } elseif ($cid !== '' && $g['white_cid'] === $cid) {
-            $color = 'white';
-        } elseif ($cid !== '' && $g['black_cid'] === $cid) {
-            $color = 'black';
+        } elseif (isset($claims[$g['id']])) {
+            $proven = chess_duell_color_for_token($g, $claims[$g['id']]);
+            if ($proven === 'w') {
+                $color = 'white';
+            } elseif ($proven === 'b') {
+                $color = 'black';
+            }
         }
         if ($color === null) {
             continue;
         }
         $opponent = ($color === 'white')
-            ? (!empty($g['black_token']) ? ($g['black_name'] !== '' ? $g['black_name'] : 'Schwarz') : '')
-            : ($g['white_name'] !== '' ? $g['white_name'] : 'Weiß');
+            ? (!empty($g['black_token']) ? ($g['black_name'] !== '' ? $g['black_name'] : __( 'Black', 'human2human-chess-duell' )) : '')
+            : ($g['white_name'] !== '' ? $g['white_name'] : __( 'White', 'human2human-chess-duell' ));
         $my_code   = ($color === 'white') ? 'w' : 'b';
         $your_turn = ($g['status'] !== 'finished' && !empty($g['black_token']) && $g['turn'] === $my_code);
 
@@ -503,7 +540,11 @@ function chess_duell_rest_create($req) {
         if ($active >= $max) {
             return new WP_Error(
                 'chess_duell_full',
-                'Es laufen bereits ' . $max . ' Partien gleichzeitig. Bitte später erneut versuchen.',
+                sprintf(
+                    /* translators: %d: maximum number of simultaneous games */
+                    __( 'There are already %d games in progress. Please try again later.', 'human2human-chess-duell' ),
+                    $max
+                ),
                 array('status' => 503)
             );
         }
@@ -513,7 +554,7 @@ function chess_duell_rest_create($req) {
         $id     = substr(bin2hex(random_bytes(8)), 0, 12);
         $wtoken = bin2hex(random_bytes(16));
     } catch (Exception $e) {
-        return new WP_Error('chess_duell_rng', 'Zufallsgenerator nicht verfügbar.', array('status' => 500));
+        return new WP_Error('chess_duell_rng', __( 'Random number generator not available.', 'human2human-chess-duell' ), array('status' => 500));
     }
 
     $body = $req->get_json_params();
@@ -582,7 +623,7 @@ function chess_duell_rest_get($req) {
     $games = chess_duell_prune(chess_duell_load_games());
     $id    = $req['id'];
     if (!isset($games[$id])) {
-        return new WP_Error('chess_duell_not_found', 'Partie nicht gefunden oder abgelaufen.', array('status' => 404));
+        return new WP_Error('chess_duell_not_found', __( 'Game not found or expired.', 'human2human-chess-duell' ), array('status' => 404));
     }
 
     $game = $games[$id];
@@ -604,7 +645,7 @@ function chess_duell_rest_join($req) {
     $games = chess_duell_prune(chess_duell_load_games());
     $id    = $req['id'];
     if (!isset($games[$id])) {
-        return new WP_Error('chess_duell_not_found', 'Partie nicht gefunden oder abgelaufen.', array('status' => 404));
+        return new WP_Error('chess_duell_not_found', __( 'Game not found or expired.', 'human2human-chess-duell' ), array('status' => 404));
     }
 
     $game     = $games[$id];
@@ -637,7 +678,7 @@ function chess_duell_rest_join($req) {
         try {
             $btoken = bin2hex(random_bytes(16));
         } catch (Exception $e) {
-            return new WP_Error('chess_duell_rng', 'Zufallsgenerator nicht verfügbar.', array('status' => 500));
+            return new WP_Error('chess_duell_rng', __( 'Random number generator not available.', 'human2human-chess-duell' ), array('status' => 500));
         }
         $now = chess_duell_now_ms();
         $game['black_token'] = $btoken;
@@ -670,12 +711,12 @@ function chess_duell_rest_move($req) {
     $games = chess_duell_prune(chess_duell_load_games());
     $id    = $req['id'];
     if (!isset($games[$id])) {
-        return new WP_Error('chess_duell_not_found', 'Partie nicht gefunden oder abgelaufen.', array('status' => 404));
+        return new WP_Error('chess_duell_not_found', __( 'Game not found or expired.', 'human2human-chess-duell' ), array('status' => 404));
     }
 
     $game = $games[$id];
     if ($game['status'] === 'finished') {
-        return new WP_Error('chess_duell_finished', 'Die Partie ist bereits beendet.', array('status' => 409));
+        return new WP_Error('chess_duell_finished', __( 'This game is already finished.', 'human2human-chess-duell' ), array('status' => 409));
     }
 
     $body  = $req->get_json_params();
@@ -689,22 +730,22 @@ function chess_duell_rest_move($req) {
         $color = 'b';
     }
     if ($color === null) {
-        return new WP_Error('chess_duell_forbidden', 'Kein gültiges Spieler-Token.', array('status' => 403));
+        return new WP_Error('chess_duell_forbidden', __( 'Invalid player token.', 'human2human-chess-duell' ), array('status' => 403));
     }
 
     if (empty($game['black_token'])) {
-        return new WP_Error('chess_duell_waiting', 'Es ist noch kein Gegner verbunden.', array('status' => 409));
+        return new WP_Error('chess_duell_waiting', __( 'No opponent has joined yet.', 'human2human-chess-duell' ), array('status' => 409));
     }
 
     // Ist die Seite am Zug?
     if ($color !== $game['turn']) {
-        return new WP_Error('chess_duell_not_your_turn', 'Du bist nicht am Zug.', array('status' => 409));
+        return new WP_Error('chess_duell_not_your_turn', __( 'It is not your turn.', 'human2human-chess-duell' ), array('status' => 409));
     }
 
     $from = isset($body['from']) ? (string) $body['from'] : '';
     $to   = isset($body['to']) ? (string) $body['to'] : '';
     if (!chess_duell_valid_square($from) || !chess_duell_valid_square($to)) {
-        return new WP_Error('chess_duell_bad_move', 'Ungültige Felder.', array('status' => 400));
+        return new WP_Error('chess_duell_bad_move', __( 'Invalid squares.', 'human2human-chess-duell' ), array('status' => 400));
     }
 
     $promotion = isset($body['promotion']) ? strtolower((string) $body['promotion']) : null;
@@ -733,12 +774,12 @@ function chess_duell_rest_move($req) {
 
     // Sicherheitsnetz: Stellung am Zug muss zur Spieldatensatz-Farbe passen.
     if ($engine->turn !== $game['turn']) {
-        return new WP_Error('chess_duell_state', 'Stellung inkonsistent.', array('status' => 409));
+        return new WP_Error('chess_duell_state', __( 'Inconsistent position.', 'human2human-chess-duell' ), array('status' => 409));
     }
 
     $applied = $engine->move($from, $to, $promotion);
     if ($applied === null) {
-        return new WP_Error('chess_duell_illegal', 'Ungültiger Zug.', array('status' => 422));
+        return new WP_Error('chess_duell_illegal', __( 'Illegal move.', 'human2human-chess-duell' ), array('status' => 422));
     }
 
     $game['moves'][] = array(
@@ -795,7 +836,7 @@ function chess_duell_rest_resign($req) {
     $games = chess_duell_prune(chess_duell_load_games());
     $id    = $req['id'];
     if (!isset($games[$id])) {
-        return new WP_Error('chess_duell_not_found', 'Partie nicht gefunden oder abgelaufen.', array('status' => 404));
+        return new WP_Error('chess_duell_not_found', __( 'Game not found or expired.', 'human2human-chess-duell' ), array('status' => 404));
     }
 
     $game  = $games[$id];
@@ -809,7 +850,7 @@ function chess_duell_rest_resign($req) {
         $color = 'b';
     }
     if ($color === null) {
-        return new WP_Error('chess_duell_forbidden', 'Kein gültiges Spieler-Token.', array('status' => 403));
+        return new WP_Error('chess_duell_forbidden', __( 'Invalid player token.', 'human2human-chess-duell' ), array('status' => 403));
     }
 
     if ($game['status'] !== 'finished') {
@@ -830,26 +871,26 @@ function chess_duell_rest_chat($req) {
     $games = chess_duell_prune(chess_duell_load_games());
     $id    = $req['id'];
     if (!isset($games[$id])) {
-        return new WP_Error('chess_duell_not_found', 'Partie nicht gefunden oder abgelaufen.', array('status' => 404));
+        return new WP_Error('chess_duell_not_found', __( 'Game not found or expired.', 'human2human-chess-duell' ), array('status' => 404));
     }
     $game  = $games[$id];
     $body  = $req->get_json_params();
     $token = isset($body['token']) ? (string) $body['token'] : '';
     $color = chess_duell_color_for_token($game, $token);
     if ($color === null) {
-        return new WP_Error('chess_duell_forbidden', 'Kein gültiges Spieler-Token.', array('status' => 403));
+        return new WP_Error('chess_duell_forbidden', __( 'Invalid player token.', 'human2human-chess-duell' ), array('status' => 403));
     }
 
     $text = isset($body['text']) ? sanitize_text_field((string) $body['text']) : '';
     $text = trim($text);
     if ($text === '') {
-        return new WP_Error('chess_duell_empty', 'Leere Nachricht.', array('status' => 400));
+        return new WP_Error('chess_duell_empty', __( 'Empty message.', 'human2human-chess-duell' ), array('status' => 400));
     }
     $text = function_exists('mb_substr') ? mb_substr($text, 0, 500) : substr($text, 0, 500);
 
     $name = ($color === 'w')
-        ? ($game['white_name'] !== '' ? $game['white_name'] : 'Weiß')
-        : ($game['black_name'] !== '' ? $game['black_name'] : 'Schwarz');
+        ? ($game['white_name'] !== '' ? $game['white_name'] : __( 'White', 'human2human-chess-duell' ))
+        : ($game['black_name'] !== '' ? $game['black_name'] : __( 'Black', 'human2human-chess-duell' ));
 
     $game['messages'][] = array('color' => $color, 'name' => $name, 'text' => $text, 'time' => time());
     if (count($game['messages']) > 300) {
@@ -868,8 +909,8 @@ function chess_duell_rest_chat($req) {
 
 add_action('admin_menu', function () {
     add_options_page(
-        'Chess Duell',
-        'Chess Duell',
+        'Human2Human Chess Duell',
+        'Human2Human Chess Duell',
         'manage_options',
         'chess-duell',
         'chess_duell_settings_page'
@@ -915,7 +956,7 @@ function chess_duell_handle_admin_actions() {
         if ($id !== '' && isset($games[$id])) {
             unset($games[$id]);
             chess_duell_save_games($games);
-            add_settings_error('chess_duell', 'cd_deleted', 'Partie gelöscht.', 'updated');
+            add_settings_error('chess_duell', 'cd_deleted', __( 'Game deleted.', 'human2human-chess-duell' ), 'updated');
         }
     } elseif ($action === 'delete_finished') {
         $removed = 0;
@@ -923,7 +964,8 @@ function chess_duell_handle_admin_actions() {
             if ($g['status'] === 'finished') { unset($games[$gid]); $removed++; }
         }
         chess_duell_save_games($games);
-        add_settings_error('chess_duell', 'cd_deleted_fin', sprintf('%d beendete Partie(n) entfernt.', $removed), 'updated');
+        /* translators: %d: number of removed games */
+        add_settings_error('chess_duell', 'cd_deleted_fin', sprintf(__( '%d finished game(s) removed.', 'human2human-chess-duell' ), $removed), 'updated');
     }
 }
 
@@ -943,47 +985,53 @@ function chess_duell_settings_page() {
     settings_errors('chess_duell');
     ?>
     <div class="wrap">
-        <h1>Chess Duell – Einstellungen</h1>
+        <h1><?php esc_html_e('Human2Human Chess Duell – Settings', 'human2human-chess-duell'); ?></h1>
         <form method="post" action="options.php">
             <?php settings_fields('chess_duell_group'); ?>
             <table class="form-table" role="presentation">
                 <tr>
-                    <th scope="row"><label for="cd-max">Maximale gleichzeitige Partien</label></th>
+                    <th scope="row"><label for="cd-max"><?php esc_html_e('Maximum simultaneous games', 'human2human-chess-duell'); ?></label></th>
                     <td>
                         <input name="<?php echo esc_attr(CHESS_DUELL_SETTINGS); ?>[max_games]" id="cd-max"
                                type="number" min="1" max="200" step="1"
                                value="<?php echo esc_attr($s['max_games']); ?>" class="small-text">
-                        <p class="description">Wie viele laufende Partien gleichzeitig erlaubt sind (1–200). Beendete Partien zählen nicht mit.</p>
+                        <p class="description"><?php esc_html_e('How many games may be in progress at the same time (1–200). Finished games do not count.', 'human2human-chess-duell'); ?></p>
                     </td>
                 </tr>
                 <tr>
-                    <th scope="row">Angemeldete Nutzer</th>
+                    <th scope="row"><?php esc_html_e('Logged-in users', 'human2human-chess-duell'); ?></th>
                     <td>
                         <label>
                             <input type="checkbox" name="<?php echo esc_attr(CHESS_DUELL_SETTINGS); ?>[allow_bypass]"
                                    value="1" <?php checked(!empty($s['allow_bypass'])); ?>>
-                            Angemeldete WordPress-Nutzer dürfen das Limit gleichzeitiger Partien übergehen
+                            <?php esc_html_e('Logged-in WordPress users may bypass the limit of simultaneous games', 'human2human-chess-duell'); ?>
                         </label>
-                        <p class="description">Wenn deaktiviert, gilt das Limit oben für alle – auch für angemeldete Nutzer.</p>
+                        <p class="description"><?php esc_html_e('If disabled, the limit above applies to everyone – including logged-in users.', 'human2human-chess-duell'); ?></p>
                     </td>
                 </tr>
                 <tr>
-                    <th scope="row"><label for="cd-ttl">Laufzeit bis Auto-Ende (Tage)</label></th>
+                    <th scope="row"><label for="cd-ttl"><?php esc_html_e('Lifetime until automatic removal (days)', 'human2human-chess-duell'); ?></label></th>
                     <td>
                         <input name="<?php echo esc_attr(CHESS_DUELL_SETTINGS); ?>[ttl_days]" id="cd-ttl"
                                type="number" min="1" max="365" step="1"
                                value="<?php echo esc_attr($s['ttl_days']); ?>" class="small-text">
-                        <p class="description">Nach so vielen Tagen ohne Aktivität wird eine Partie automatisch entfernt (1–365). Ansonsten endet eine Partie nur durch Matt, Aufgabe oder Remis.</p>
+                        <p class="description"><?php esc_html_e('After this many days without activity a game is removed automatically (1–365). Otherwise a game only ends by checkmate, resignation or draw.', 'human2human-chess-duell'); ?></p>
                     </td>
                 </tr>
             </table>
             <?php submit_button(); ?>
         </form>
 
-        <h2>Laufende Partien</h2>
+        <h2><?php esc_html_e('Games in progress', 'human2human-chess-duell'); ?></h2>
         <p>
-            <strong><?php echo intval($active); ?></strong> laufende Partie(n),
-            <strong><?php echo count($games); ?></strong> gespeichert insgesamt.
+            <?php
+            printf(
+                /* translators: 1: number of games in progress, 2: total number of stored games */
+                esc_html__('%1$s game(s) in progress, %2$s stored in total.', 'human2human-chess-duell'),
+                '<strong>' . intval($active) . '</strong>',
+                '<strong>' . intval(count($games)) . '</strong>'
+            );
+            ?>
         </p>
         <?php chess_duell_render_games_table($games); ?>
 
@@ -995,24 +1043,28 @@ function chess_duell_settings_page() {
 /** Tabelle aller gespeicherten Partien mit Lösch-Aktion. */
 function chess_duell_render_games_table($games) {
     if (empty($games)) {
-        echo '<p>Aktuell sind keine Partien gespeichert.</p>';
+        echo '<p>' . esc_html__('No games are currently stored.', 'human2human-chess-duell') . '</p>';
         return;
     }
-    $status_labels = array('waiting' => 'Wartet auf Gegner', 'active' => 'Läuft', 'finished' => 'Beendet');
+    $status_labels = array(
+        'waiting'  => __( 'Waiting for opponent', 'human2human-chess-duell' ),
+        'active'   => __( 'In progress', 'human2human-chess-duell' ),
+        'finished' => __( 'Finished', 'human2human-chess-duell' ),
+    );
     // Neueste zuerst.
     uasort($games, function ($a, $b) { return intval($b['updated']) - intval($a['updated']); });
     ?>
     <table class="wp-list-table widefat fixed striped">
         <thead>
             <tr>
-                <th>Status</th>
-                <th>Weiß</th>
-                <th>Schwarz</th>
-                <th>Züge</th>
-                <th>Am Zug</th>
-                <th>Uhr</th>
-                <th>Letzte Aktivität</th>
-                <th>Aktion</th>
+                <th><?php esc_html_e('Status', 'human2human-chess-duell'); ?></th>
+                <th><?php esc_html_e('White', 'human2human-chess-duell'); ?></th>
+                <th><?php esc_html_e('Black', 'human2human-chess-duell'); ?></th>
+                <th><?php esc_html_e('Moves', 'human2human-chess-duell'); ?></th>
+                <th><?php esc_html_e('To move', 'human2human-chess-duell'); ?></th>
+                <th><?php esc_html_e('Clock', 'human2human-chess-duell'); ?></th>
+                <th><?php esc_html_e('Last activity', 'human2human-chess-duell'); ?></th>
+                <th><?php esc_html_e('Action', 'human2human-chess-duell'); ?></th>
             </tr>
         </thead>
         <tbody>
@@ -1021,20 +1073,23 @@ function chess_duell_render_games_table($games) {
             if ($g['status'] === 'finished' && !empty($g['result'])) {
                 $status .= ' (' . $g['result'] . ')';
             }
-            $white = $g['white_name'] !== '' ? $g['white_name'] : 'Weiß';
+            $white = $g['white_name'] !== '' ? $g['white_name'] : __( 'White', 'human2human-chess-duell' );
             if (!empty($g['white_user'])) {
                 $wu = get_userdata(intval($g['white_user']));
                 if ($wu) { $white .= ' (@' . $wu->user_login . ')'; }
             }
-            $black = !empty($g['black_token']) ? ($g['black_name'] !== '' ? $g['black_name'] : 'Schwarz') : '—';
+            $black = !empty($g['black_token']) ? ($g['black_name'] !== '' ? $g['black_name'] : __( 'Black', 'human2human-chess-duell' )) : '—';
             if (!empty($g['black_user'])) {
                 $bu = get_userdata(intval($g['black_user']));
                 if ($bu) { $black .= ' (@' . $bu->user_login . ')'; }
             }
-            $turn  = $g['status'] === 'finished' ? '—' : ($g['turn'] === 'w' ? 'Weiß' : 'Schwarz');
-            $clock = !empty($g['clock_enabled']) ? (intval($g['clock_base'] / 60000) . ' Min'
-                     . (intval($g['clock_inc']) > 0 ? ' +' . intval($g['clock_inc'] / 1000) . ' Sek' : '')) : '—';
-            $ago   = human_time_diff(intval($g['updated']), time()) . ' her';
+            $turn  = $g['status'] === 'finished' ? '—' : ($g['turn'] === 'w' ? __( 'White', 'human2human-chess-duell' ) : __( 'Black', 'human2human-chess-duell' ));
+            /* translators: %d: base time in minutes */
+            $clock = !empty($g['clock_enabled']) ? (sprintf(__( '%d min', 'human2human-chess-duell' ), intval($g['clock_base'] / 60000))
+                     /* translators: %d: increment in seconds per move */
+                     . (intval($g['clock_inc']) > 0 ? ' ' . sprintf(__( '+%d sec', 'human2human-chess-duell' ), intval($g['clock_inc'] / 1000)) : '')) : '—';
+            /* translators: %s: human-readable time difference, e.g. "3 hours" */
+            $ago   = sprintf(__( '%s ago', 'human2human-chess-duell' ), human_time_diff(intval($g['updated']), time()));
         ?>
             <tr>
                 <td><?php echo esc_html($status); ?></td>
@@ -1046,11 +1101,11 @@ function chess_duell_render_games_table($games) {
                 <td><?php echo esc_html($ago); ?></td>
                 <td>
                     <form method="post" style="margin:0;"
-                          onsubmit="return confirm('Diese Partie wirklich löschen?');">
+                          onsubmit="return confirm('<?php echo esc_js(__( 'Really delete this game?', 'human2human-chess-duell' )); ?>');">
                         <?php wp_nonce_field('chess_duell_manage'); ?>
                         <input type="hidden" name="chess_duell_action" value="delete">
                         <input type="hidden" name="game" value="<?php echo esc_attr($id); ?>">
-                        <button type="submit" class="button button-small button-link-delete">Löschen</button>
+                        <button type="submit" class="button button-small button-link-delete"><?php esc_html_e('Delete', 'human2human-chess-duell'); ?></button>
                     </form>
                 </td>
             </tr>
@@ -1058,10 +1113,10 @@ function chess_duell_render_games_table($games) {
         </tbody>
     </table>
     <form method="post" style="margin-top:0.8em;"
-          onsubmit="return confirm('Alle beendeten Partien entfernen?');">
+          onsubmit="return confirm('<?php echo esc_js(__( 'Remove all finished games?', 'human2human-chess-duell' )); ?>');">
         <?php wp_nonce_field('chess_duell_manage'); ?>
         <input type="hidden" name="chess_duell_action" value="delete_finished">
-        <button type="submit" class="button">Alle beendeten Partien entfernen</button>
+        <button type="submit" class="button"><?php esc_html_e('Remove all finished games', 'human2human-chess-duell'); ?></button>
     </form>
     <?php
 }
@@ -1073,7 +1128,8 @@ function chess_duell_render_games_table($games) {
 add_action('wp_enqueue_scripts', function () {
     wp_register_style('chess-duell', CHESS_DUELL_URL . 'assets/css/chess-duell.css', array(), CHESS_DUELL_VERSION);
     wp_register_script('chess-duell-engine', CHESS_DUELL_URL . 'assets/js/engine.js', array(), CHESS_DUELL_VERSION, true);
-    wp_register_script('chess-duell-app', CHESS_DUELL_URL . 'assets/js/app.js', array('chess-duell-engine'), CHESS_DUELL_VERSION, true);
+    wp_register_script('chess-duell-app', CHESS_DUELL_URL . 'assets/js/app.js', array('chess-duell-engine', 'wp-i18n'), CHESS_DUELL_VERSION, true);
+    wp_set_script_translations('chess-duell-app', 'human2human-chess-duell', CHESS_DUELL_PATH . 'languages');
 });
 
 function chess_duell_shortcode($atts) {
