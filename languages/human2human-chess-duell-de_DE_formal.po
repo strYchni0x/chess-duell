@@ -84,6 +84,21 @@ msgstr "Laufzeit bis Auto-Ende (Tage)"
 msgid "After this many days without activity a game is removed automatically (1–365). Otherwise a game only ends by checkmate, resignation or draw."
 msgstr "Nach so vielen Tagen ohne Aktivität wird eine Partie automatisch entfernt (1–365). Ansonsten endet eine Partie nur durch Matt, Aufgabe oder Remis."
 
+msgid "“Your turn” email"
+msgstr "„Du bist am Zug“-E-Mail"
+
+msgid "Send an email to a player when it is their turn (if they entered an address)"
+msgstr "Einem Spieler eine E-Mail senden, wenn er am Zug ist (sofern eine Adresse hinterlegt wurde)"
+
+msgid "Turn this off to stop all move notifications, e.g. if your host limits outgoing email."
+msgstr "Ausschalten, um alle Zug-Benachrichtigungen zu stoppen – z. B. wenn dein Hoster den E-Mail-Versand begrenzt."
+
+msgid "Email limit (per 30 minutes)"
+msgstr "E-Mail-Limit (pro 30 Minuten)"
+
+msgid "Maximum number of notification emails sent within any 30-minute window. Once reached, further notifications are skipped until the window frees up (players still see the move when they open the game). Set to 0 for no limit. Keep this below your hosting provider’s email limit."
+msgstr "Maximale Anzahl an Benachrichtigungs-Mails innerhalb eines 30-Minuten-Fensters. Ist es erreicht, werden weitere Benachrichtigungen ausgelassen, bis das Fenster wieder frei ist (Spieler sehen den Zug beim Öffnen der Partie). 0 = kein Limit. Halte den Wert unter dem E-Mail-Limit deines Hosters."
+
 msgid "Games in progress"
 msgstr "Laufende Partien"
 

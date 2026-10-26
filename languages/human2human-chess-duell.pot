@@ -83,6 +83,21 @@ msgstr ""
 msgid "After this many days without activity a game is removed automatically (1–365). Otherwise a game only ends by checkmate, resignation or draw."
 msgstr ""
 
+msgid "“Your turn” email"
+msgstr ""
+
+msgid "Send an email to a player when it is their turn (if they entered an address)"
+msgstr ""
+
+msgid "Turn this off to stop all move notifications, e.g. if your host limits outgoing email."
+msgstr ""
+
+msgid "Email limit (per 30 minutes)"
+msgstr ""
+
+msgid "Maximum number of notification emails sent within any 30-minute window. Once reached, further notifications are skipped until the window frees up (players still see the move when they open the game). Set to 0 for no limit. Keep this below your hosting provider’s email limit."
+msgstr ""
+
 msgid "Games in progress"
 msgstr ""
 

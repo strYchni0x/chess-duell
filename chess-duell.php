@@ -3,7 +3,7 @@
  * Plugin Name:       Human2Human Chess Duell
  * Plugin URI:        https://github.com/strYchni0x/chess-duell
  * Description:        Two people play chess online against each other - just share a link. Number of simultaneous games and lifetime configurable in the backend. Server-side rule validation (no cheating possible), no AI. Embed with the shortcode [chess_duell].
- * Version:           1.11.1
+ * Version:           1.12.0
  * Author:            Florian Willnat
  * License:           GPL-2.0-or-later
  * License URI:       https://www.gnu.org/licenses/gpl-2.0.html
@@ -15,14 +15,18 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('CHESS_DUELL_VERSION', '1.11.1');
+define('CHESS_DUELL_VERSION', '1.12.0');
 define('CHESS_DUELL_URL', plugin_dir_url(__FILE__));
 define('CHESS_DUELL_PATH', plugin_dir_path(__FILE__));
 define('CHESS_DUELL_OPTION', 'chess_duell_games');
 define('CHESS_DUELL_SETTINGS', 'chess_duell_settings');
+define('CHESS_DUELL_MAIL_LOG', 'chess_duell_mail_log'); // Zeitstempel gesendeter Benachrichtigungen (Ratenbegrenzung)
 
 define('CHESS_DUELL_DEFAULT_MAX_GAMES', 10); // Standard: max. gleichzeitige Partien
 define('CHESS_DUELL_DEFAULT_TTL_DAYS', 14);  // Standard: Tage bis eine inaktive Partie verfällt
+define('CHESS_DUELL_DEFAULT_NOTIFY', true);  // "Du bist am Zug"-Mails ab Werk aktiv
+define('CHESS_DUELL_DEFAULT_MAIL_LIMIT', 40); // Standard: max. Benachrichtigungs-Mails je Zeitfenster (0 = kein Limit)
+define('CHESS_DUELL_MAIL_WINDOW', 1800);      // Zeitfenster der Ratenbegrenzung in Sekunden (30 Minuten)
 
 // Schachuhr: Es zählt nur die Online-Zeit des Spielers am Zug. Ein "Heartbeat"
 // (Polling) gilt als online. Lücken größer als dieses Fenster werden gekappt,
@@ -64,6 +68,8 @@ function chess_duell_get_settings() {
         'max_games'    => CHESS_DUELL_DEFAULT_MAX_GAMES,
         'ttl_days'     => CHESS_DUELL_DEFAULT_TTL_DAYS,
         'allow_bypass' => true, // angemeldete Nutzer dürfen das Limit übergehen
+        'notify_email' => CHESS_DUELL_DEFAULT_NOTIFY,     // "Du bist am Zug"-Mails senden?
+        'mail_limit'   => CHESS_DUELL_DEFAULT_MAIL_LIMIT, // max. Mails je 30 min (0 = kein Limit)
     );
     $s = get_option(CHESS_DUELL_SETTINGS, array());
     if (!is_array($s)) {
@@ -88,6 +94,48 @@ function chess_duell_ttl() {
 function chess_duell_allow_bypass() {
     $s = chess_duell_get_settings();
     return !empty($s['allow_bypass']);
+}
+
+/** Sind "Du bist am Zug"-E-Mail-Benachrichtigungen aktiviert? */
+function chess_duell_notify_enabled() {
+    $s = chess_duell_get_settings();
+    return !empty($s['notify_email']);
+}
+
+/** Maximale Benachrichtigungs-Mails je Zeitfenster (0 = kein Limit). */
+function chess_duell_mail_limit() {
+    $s = chess_duell_get_settings();
+    return max(0, intval($s['mail_limit']));
+}
+
+/**
+ * Ratenbegrenzung: Prüft, ob im aktuellen 30-Minuten-Fenster noch eine
+ * Benachrichtigungs-Mail gesendet werden darf, und verbucht sie ggf. Gibt true
+ * zurück, wenn gesendet werden darf (dann ist der Zeitstempel bereits gespeichert).
+ * Schützt vor dem Überschreiten von Hoster-Limits (z. B. 50 Mails / 30 min).
+ */
+function chess_duell_mail_reserve() {
+    $limit = chess_duell_mail_limit();
+    if ($limit <= 0) {
+        return true; // kein Limit gesetzt
+    }
+    $now    = time();
+    $cutoff = $now - CHESS_DUELL_MAIL_WINDOW;
+    $log    = get_option(CHESS_DUELL_MAIL_LOG, array());
+    if (!is_array($log)) {
+        $log = array();
+    }
+    // Zeitstempel außerhalb des Fensters verwerfen.
+    $log = array_values(array_filter($log, function ($ts) use ($cutoff) {
+        return intval($ts) >= $cutoff;
+    }));
+    if (count($log) >= $limit) {
+        update_option(CHESS_DUELL_MAIL_LOG, $log, false); // bereinigten Stand sichern
+        return false;
+    }
+    $log[] = $now;
+    update_option(CHESS_DUELL_MAIL_LOG, $log, false);
+    return true;
 }
 
 /* ------------------------------------------------------------------ *
@@ -373,10 +421,19 @@ function chess_duell_notify_turn(&$game, $color) {
     if (empty($email)) {
         return;
     }
+    // Benachrichtigungen im Backend komplett abschaltbar.
+    if (!chess_duell_notify_enabled()) {
+        return;
+    }
     // Einfacher Spam-Schutz: höchstens alle 10 Sekunden eine Mail je Spieler.
     $key  = ($color === 'w') ? 'last_notify_w' : 'last_notify_b';
     $now  = time();
     if ($now - intval($game[$key]) < 10) {
+        return;
+    }
+    // Globale Ratenbegrenzung (Hoster-Limit). Wird das Limit erreicht, wird diese
+    // Benachrichtigung ausgelassen; der Spieler sieht den Zug beim nächsten Öffnen.
+    if (!chess_duell_mail_reserve()) {
         return;
     }
     $game[$key] = $now;
@@ -925,6 +982,8 @@ add_action('admin_init', function () {
             'max_games'    => CHESS_DUELL_DEFAULT_MAX_GAMES,
             'ttl_days'     => CHESS_DUELL_DEFAULT_TTL_DAYS,
             'allow_bypass' => true,
+            'notify_email' => CHESS_DUELL_DEFAULT_NOTIFY,
+            'mail_limit'   => CHESS_DUELL_DEFAULT_MAIL_LIMIT,
         ),
     ));
 });
@@ -939,6 +998,10 @@ function chess_duell_sanitize_settings($input) {
     if ($out['ttl_days'] > 365)  { $out['ttl_days'] = 365; }
     // Checkbox: nicht gesetzt => deaktiviert.
     $out['allow_bypass'] = !empty($input['allow_bypass']);
+    $out['notify_email'] = !empty($input['notify_email']);
+    $out['mail_limit']   = isset($input['mail_limit']) ? intval($input['mail_limit']) : CHESS_DUELL_DEFAULT_MAIL_LIMIT;
+    if ($out['mail_limit'] < 0)    { $out['mail_limit'] = 0; }
+    if ($out['mail_limit'] > 1000) { $out['mail_limit'] = 1000; }
     return $out;
 }
 
@@ -1016,6 +1079,26 @@ function chess_duell_settings_page() {
                                type="number" min="1" max="365" step="1"
                                value="<?php echo esc_attr($s['ttl_days']); ?>" class="small-text">
                         <p class="description"><?php esc_html_e('After this many days without activity a game is removed automatically (1–365). Otherwise a game only ends by checkmate, resignation or draw.', 'human2human-chess-duell'); ?></p>
+                    </td>
+                </tr>
+                <tr>
+                    <th scope="row"><?php esc_html_e('“Your turn” email', 'human2human-chess-duell'); ?></th>
+                    <td>
+                        <label>
+                            <input type="checkbox" name="<?php echo esc_attr(CHESS_DUELL_SETTINGS); ?>[notify_email]"
+                                   value="1" <?php checked(!empty($s['notify_email'])); ?>>
+                            <?php esc_html_e('Send an email to a player when it is their turn (if they entered an address)', 'human2human-chess-duell'); ?>
+                        </label>
+                        <p class="description"><?php esc_html_e('Turn this off to stop all move notifications, e.g. if your host limits outgoing email.', 'human2human-chess-duell'); ?></p>
+                    </td>
+                </tr>
+                <tr>
+                    <th scope="row"><label for="cd-mail-limit"><?php esc_html_e('Email limit (per 30 minutes)', 'human2human-chess-duell'); ?></label></th>
+                    <td>
+                        <input name="<?php echo esc_attr(CHESS_DUELL_SETTINGS); ?>[mail_limit]" id="cd-mail-limit"
+                               type="number" min="0" max="1000" step="1"
+                               value="<?php echo esc_attr($s['mail_limit']); ?>" class="small-text">
+                        <p class="description"><?php esc_html_e('Maximum number of notification emails sent within any 30-minute window. Once reached, further notifications are skipped until the window frees up (players still see the move when they open the game). Set to 0 for no limit. Keep this below your hosting provider’s email limit.', 'human2human-chess-duell'); ?></p>
                     </td>
                 </tr>
             </table>
@@ -1165,4 +1248,5 @@ register_uninstall_hook(__FILE__, 'chess_duell_uninstall');
 function chess_duell_uninstall() {
     delete_option(CHESS_DUELL_OPTION);
     delete_option(CHESS_DUELL_SETTINGS);
+    delete_option(CHESS_DUELL_MAIL_LOG);
 }

@@ -4,7 +4,7 @@ Tags: chess, game, multiplayer, two-player, board-game
 Requires at least: 5.6
 Tested up to: 7.1
 Requires PHP: 7.2
-Stable tag: 1.11.1
+Stable tag: 1.12.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -73,6 +73,10 @@ computes the position (FEN), notation (SAN) and game end itself and is the singl
 source of truth. A manipulated client cannot force an illegal move.
 
 == Changelog ==
+
+= 1.12.0 =
+* New: "your turn" e-mail notifications can now be turned off entirely in the settings.
+* New: optional limit on how many notification e-mails are sent per 30 minutes (default 40, 0 = no limit) to stay within a hosting provider's outgoing-mail limit. When the limit is reached, further notifications are skipped; players still see the move when they open the game.
 
 = 1.11.1 =
 * Security: turn-notification e-mails now always link to your own site. The optional per-game return URL is restricted to the site's own host, so a crafted game can no longer point the notification link at an external (phishing) domain. Already-stored games are covered too.
